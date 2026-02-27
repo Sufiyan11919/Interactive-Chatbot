@@ -33,4 +33,4 @@ inputField.addEventListener("keydown", function (e) {
   if (e.key === "Enter") {
     sendMessage();
   }
-});ß
+});
