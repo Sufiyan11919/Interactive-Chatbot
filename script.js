@@ -24,3 +24,13 @@ function sendMessage() {
   // Clear input field
   inputField.value = "";
 }
+
+// Step 3: Click listener on send button
+sendBtn.addEventListener("click", sendMessage);
+
+// Step 4: Enter key listener on input field
+inputField.addEventListener("keydown", function (e) {
+  if (e.key === "Enter") {
+    sendMessage();
+  }
+});ß
