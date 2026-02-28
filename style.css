@@ -1,0 +1,26 @@
+/* Chat Functionality */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Roboto", sans-serif;
+  background-color: #f0f2f5;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+}
+
+.app-container {
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  width: 92%;
+  max-width: 1200px;
+  min-height: 85vh;
+}
