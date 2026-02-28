@@ -127,3 +127,101 @@ body {
   color: #333;
   border-bottom-left-radius: 2px;
 }
+
+/* ---------- Left Panel: Document Upload ---------- */
+.card {
+  background: rgb(248, 249, 250);
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 18px;
+}
+
+.btn-success {
+  background: rgb(40, 167, 68);
+  color: #fff;
+  width: 120px;
+}
+
+.btn-success:hover {
+  background: rgb(32, 140, 56);
+}
+
+#doc-panel {
+  width: 360px;
+  flex-shrink: 0;
+  align-self: flex-start;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+#upload-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.custom-file-input {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#file-input {
+  display: none;
+}
+
+.file-label {
+  padding: 6px 14px;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.file-label:hover {
+  background: #f3f4f6;
+}
+
+#file-name {
+  font-size: 0.85rem;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.uploaded-section {
+  padding-top: 6px;
+}
+
+.empty-state {
+  text-align: center;
+  color: #6b7280;
+  font-style: italic;
+  margin-top: 18px;
+}
+
+#docs-list {
+  list-style: none;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#docs-list li {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 0.95rem;
+  color: #111827;
+}
