@@ -60,3 +60,70 @@ body {
 .btn-primary:hover {
   background: #0262cc;
 }
+
+/* ---------- Right Panel: Chat ---------- */
+#chat-container {
+  flex: 1;
+  min-width: 300px;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  padding: 22px;
+}
+
+#messages {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: rgb(248, 249, 250);
+  padding: 14px;
+}
+
+.input-area {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+#user-input {
+  flex: 1;
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+  outline: none;
+}
+
+#user-input:focus {
+  border-color: #027bff;
+}
+
+.message {
+  max-width: 70%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  word-wrap: break-word;
+  margin-bottom: 10px;
+}
+
+.message.user {
+  margin-left: auto;
+  background-color: #1a73e8;
+  color: #fff;
+  border-bottom-right-radius: 2px;
+}
+
+.message.system {
+  margin-right: auto;
+  background-color: #e8e8e8;
+  color: #333;
+  border-bottom-left-radius: 2px;
+}
