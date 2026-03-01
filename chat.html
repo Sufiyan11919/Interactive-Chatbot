@@ -34,10 +34,17 @@
             <section id="uploaded-docs" class="uploaded-section">
                 <h3 class="section-title">Uploaded Documents</h3>
 
-                <!-- Empty state until added tp list -->
                 <p id="empty-docs" class="empty-state">No documents uploaded yet</p>
 
                 <ul id="docs-list"></ul>
+            </section>
+
+            <section class="card retrieval-card">
+                <label for="retrieval-method" class="section-title">Retrieval Method</label>
+                <select id="retrieval-method">
+                    <option value="semantic">Semantic (Embeddings)</option>
+                    <option value="tfidf">TF-IDF (Keyword)</option>
+                </select>
             </section>
         </aside>
 
