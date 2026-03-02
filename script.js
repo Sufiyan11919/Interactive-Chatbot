@@ -35,7 +35,21 @@ inputField.addEventListener("keydown", function (e) {
   }
 });
 
-// Document Upload Functionality
+// Step 5: Change listener for retrieval dropdown
+const retrievalMethod = document.getElementById("retrieval-method");
+
+retrievalMethod.addEventListener("change", function () {
+  const selected = retrievalMethod.value;
+  console.log("Retrieval method: " + selected);
+
+  // Display system message in chat
+  const msgDiv = document.createElement("div");
+  msgDiv.classList.add("message", "system");
+  msgDiv.textContent = "Retrieval method changed to: " + selected;
+  messagesContainer.appendChild(msgDiv);
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+});
+
 // Step 6: Upload button logs selected file and adds to doc list
 const uploadBtn = document.getElementById("upload-btn");
 const fileInput = document.getElementById("file-input");
