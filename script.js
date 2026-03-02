@@ -52,4 +52,17 @@ fileInput.addEventListener("change", function () {
   }
 });
 
+uploadBtn.addEventListener("click", function () {
+  if (fileInput.files.length > 0) {
+    const name = fileInput.files[0].name;
 
+    const li = document.createElement("li");
+    li.textContent = name;
+    docsList.appendChild(li);
+
+    emptyDocs.style.display = "none";
+    console.log("Selected file: " + name);
+  } else {
+    console.log("No file chosen");
+  }
+});
