@@ -1,9 +1,14 @@
-// Step 1: Constant variables retrieved by ID
 const inputField = document.getElementById("user-input");
 const sendBtn = document.getElementById("send-btn");
 const messagesContainer = document.getElementById("messages");
+const retrievalMethod = document.getElementById("retrieval-method");
+const uploadBtn = document.getElementById("upload-btn");
+const fileInput = document.getElementById("file-input");
+const fileNameSpan = document.getElementById("file-name");
+const docsList = document.getElementById("docs-list");
+const emptyDocs = document.getElementById("empty-docs");
 
-// Step 2: sendMessage function
+// Send user message and display it in the chat window
 function sendMessage() {
   const text = inputField.value.trim();
 
@@ -12,50 +17,33 @@ function sendMessage() {
     return;
   }
 
-  // Display user message in chat window
-  const msgDiv = document.createElement("div");
+  const msgDiv
   msgDiv.classList.add("message", "user");
   msgDiv.textContent = text;
   messagesContainer.appendChild(msgDiv);
 
-  // Scroll to bottom
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
-
-  // Clear input field
   inputField.value = "";
 }
 
-// Step 3: Click listener on send button
 sendBtn.addEventListener("click", sendMessage);
-
-// Step 4: Enter key listener on input field
 inputField.addEventListener("keydown", function (e) {
   if (e.key === "Enter") {
     sendMessage();
   }
 });
 
-// Step 5: Change listener for retrieval dropdown
-const retrievalMethod = document.getElementById("retrieval-method");
-
+// Log and display retrieval method change
 retrievalMethod.addEventListener("change", function () {
   const selected = retrievalMethod.value;
   console.log("Retrieval method: " + selected);
 
-  // Display system message in chat
   const msgDiv = document.createElement("div");
   msgDiv.classList.add("message", "system");
   msgDiv.textContent = "Retrieval method changed to: " + selected;
   messagesContainer.appendChild(msgDiv);
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
 });
-
-// Step 6: Upload button logs selected file and adds to doc list
-const uploadBtn = document.getElementById("upload-btn");
-const fileInput = document.getElementById("file-input");
-const fileNameSpan = document.getElementById("file-name");
-const docsList = document.getElementById("docs-list");
-const emptyDocs = document.getElementById("empty-docs");
 
 // Update file name display when a file is selected
 fileInput.addEventListener("change", function () {
@@ -66,6 +54,7 @@ fileInput.addEventListener("change", function () {
   }
 });
 
+// Upload button: log selected file and add to document list
 uploadBtn.addEventListener("click", function () {
   if (fileInput.files.length > 0) {
     const name = fileInput.files[0].name;
