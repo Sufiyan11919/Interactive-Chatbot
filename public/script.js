@@ -17,7 +17,7 @@ function sendMessage() {
     return;
   }
 
-  const msgDiv
+  const msgDiv = document.createElement("div");
   msgDiv.classList.add("message", "user");
   msgDiv.textContent = text;
   messagesContainer.appendChild(msgDiv);
