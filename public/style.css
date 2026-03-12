@@ -121,6 +121,14 @@ body {
   border-bottom-right-radius: 2px;
 }
 
+/* bot response css here */
+.message.bot {
+  margin-right: auto;
+  background-color: #d4edda;
+  color: #155724;
+  border-bottom-left-radius: 2px;
+}
+
 .message.system {
   margin-right: auto;
   background-color: #e8e8e8;
@@ -258,3 +266,4 @@ body {
     min-height: 60vh;
   }
 }
+

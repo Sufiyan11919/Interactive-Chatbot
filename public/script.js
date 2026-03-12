@@ -25,6 +25,29 @@ function sendMessage() {
 
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
   inputField.value = "";
+
+  // Send message and retrieval method to backend server via fetch
+  const selectedMethod = retrievalMethod.value;
+
+  fetch("/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: text, retrievalMethod: selectedMethod })
+  }).then(function (response) {
+      return response.json();
+    }).then(function (data) {
+      // testing console response
+      console.log("Server response:", data);
+
+      // Displaying bot response in chat window
+      const botDiv = document.createElement("div");
+      botDiv.classList.add("message", "bot");
+      botDiv.textContent = 'Bot: "' + data.botResponse + '"';
+      messagesContainer.appendChild(botDiv);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }).catch(function (error) {
+      console.error("Error sending message:", error);
+    });
 }
 
 // Step 3: Click listener on send button
