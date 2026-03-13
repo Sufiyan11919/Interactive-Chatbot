@@ -10,6 +10,11 @@ app.use(express.json());
 // 2.3 Serve static files from the public folder
 app.use(express.static("public"));
 
+// Serve chat.html on the root route
+app.get("/", (req, res) => {
+  res.sendFile("chat.html", { root: "public" });
+});
+
 // 2.4 POST route
 app.post("/chat", (req, res) => {
   const { message, retrievalMethod } = req.body;
