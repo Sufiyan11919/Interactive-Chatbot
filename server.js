@@ -23,7 +23,6 @@ app.post("/chat", (req, res) => {
 });
 
 // 2.5 Listen on port 3000
-// changed the port for testing
 app.listen(3000, () => {
   console.log("Server is running on http://localhost:3000");
 });
