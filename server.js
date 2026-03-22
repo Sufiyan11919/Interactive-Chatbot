@@ -1,5 +1,12 @@
+require("dotenv").config();
+
 // 2.1 Import Express
 const express = require("express");
+const mongoose = require("mongoose");
+
+// 4. Backend Step 2: Import models
+const Interaction = require("./models/Interaction");
+const EventLog    = require("./models/EventLog");
 
 // 2.2 Initialize an Express app
 const app = express();
@@ -10,9 +17,15 @@ app.use(express.json());
 // 2.3 Serve static files from the public folder
 app.use(express.static("public"));
 
-// Serve chat.html on the root route
+// 2. Set up MongoDB
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => console.log("Connected to MongoDB Atlas"))
+  .catch((err) => console.error("MongoDB connection error:", err));
+
+// Serve index.html on the root route
 app.get("/", (req, res) => {
-  res.sendFile("chat.html", { root: "public" });
+  res.sendFile("index.html", { root: "public" });
 });
 
 // 2.4 POST route
