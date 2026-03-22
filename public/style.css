@@ -348,3 +348,65 @@ body {
     width: 100%;
   }
 }
+
+/* 3. CSS Styling: Homepage */
+.home-container {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 40px 20px;
+}
+
+.home-container h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #111827;
+  text-align: center;
+  border-bottom: 3px solid #027bff;
+  padding-bottom: 14px;
+}
+
+.home-description {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.home-description p {
+  font-size: 0.97rem;
+  color: #4b5563;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.participant-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.participant-card input {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-family: "Roboto", sans-serif;
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.participant-card input:focus {
+  border-color: #027bff;
+  box-shadow: 0 0 0 4px rgba(2, 123, 255, 0.08);
+}
+
+.participant-card .btn {
+  width: 100%;
+  height: 48px;
+  font-size: 1rem;
+}

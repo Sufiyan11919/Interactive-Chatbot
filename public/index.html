@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chatbot - Welcome</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+    <!-- 3. Frontend: Homepage - Participant ID input, saves to localStorage and navigates to chatbot -->
+    <div class="home-container">
+        <h1>AI Research Chatbot</h1>
+
+        <div class="home-description">
+            <p>
+                Welcome to the AI Research Chatbot — a conversational assistant powered by OpenAI.
+                This tool is designed for research purposes, allowing participants to interact with
+                an AI assistant while their interactions are securely logged for analysis.
+            </p>
+            <p>
+                Each session is tied to a unique Participant ID. Your chat history will be saved
+                and reloaded automatically when you return with the same ID.
+            </p>
+        </div>
+
+        <div class="card participant-card">
+            <label for="participant-id" class="section-title">Enter Your Participant ID</label>
+            <input
+                type="text"
+                id="participant-id"
+                placeholder="e.g. participant_001"
+                autocomplete="off"
+            />
+            <button id="start-btn" class="btn btn-primary">Start Chat</button>
+        </div>
+    </div>
+
+    <script src="home.js"></script>
+</body>
+
+</html>
