@@ -1,4 +1,4 @@
-// 4. Backend Step 2: Interaction model - captures user messages and bot responses
+// Assignment 3 - Interaction model: captures user messages and bot responses
 const mongoose = require("mongoose");
 
 const interactionSchema = new mongoose.Schema({

@@ -1,4 +1,4 @@
-// Step 1: Constant variables retrieved by ID
+// Assignment 1, Step 1 - Constant variables retrieved by ID
 const inputField = document.getElementById("user-input");
 const sendBtn = document.getElementById("send-btn");
 const messagesContainer = document.getElementById("messages");
@@ -9,7 +9,7 @@ const fileNameSpan = document.getElementById("file-name");
 const docsList = document.getElementById("docs-list");
 const emptyDocs = document.getElementById("empty-docs");
 
-// Step 2: sendMessage() function
+// Assignment 1, Step 2 - sendMessage() function
 function sendMessage() {
   const text = inputField.value.trim();
 
@@ -26,7 +26,7 @@ function sendMessage() {
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
   inputField.value = "";
 
-  // Send message and retrieval method to backend server via fetch
+  // Assignment 2 - Send message and retrieval method to backend server via fetch
   const selectedMethod = retrievalMethod.value;
 
   fetch("/chat", {
@@ -50,17 +50,17 @@ function sendMessage() {
     });
 }
 
-// Step 3: Click listener on send button
+// Assignment 1, Step 3 - Click listener on send button
 sendBtn.addEventListener("click", sendMessage);
 
-// Step 4: Enter key listener on input field
+// Assignment 1, Step 4 - Enter key listener on input field
 inputField.addEventListener("keydown", function (e) {
   if (e.key === "Enter") {
     sendMessage();
   }
 });
 
-// Step 5: Change listener for retrieval dropdown
+// Assignment 1, Step 5 - Change listener for retrieval dropdown
 retrievalMethod.addEventListener("change", function () {
   const selected = retrievalMethod.value;
   console.log("Retrieval method: " + selected);
@@ -80,7 +80,7 @@ fileInput.addEventListener("change", function () {
   }
 });
 
-// Step 6: Upload button logs selected file and adds to document list
+// Assignment 1, Step 6 - Upload button logs selected file and adds to document list
 uploadBtn.addEventListener("click", function () {
   if (fileInput.files.length > 0) {
     const name = fileInput.files[0].name;

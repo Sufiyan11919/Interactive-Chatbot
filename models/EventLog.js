@@ -1,4 +1,4 @@
-// 4. Backend Step 2: EventLog model - captures user interaction events
+// Assignment 3 - EventLog model: captures user interaction events
 const mongoose = require("mongoose");
 
 const eventLogSchema = new mongoose.Schema({

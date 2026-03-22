@@ -1,4 +1,4 @@
-// 3. Frontend: Save Participant ID to localStorage and navigate to chatbot
+// Assignment 3 - Save Participant ID to localStorage and navigate to chatbot
 const startBtn         = document.getElementById("start-btn");
 const participantInput = document.getElementById("participant-id");
 

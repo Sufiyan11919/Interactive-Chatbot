@@ -1,4 +1,4 @@
-/* 2. CSS Styling: Roboto font, two-column layout, scrollable chat area */
+/* Assignment 1 - CSS Styling: Roboto font, two-column layout, scrollable chat area */
 
 * {
   margin: 0;
@@ -349,7 +349,7 @@ body {
   }
 }
 
-/* 3. CSS Styling: Homepage */
+/* Assignment 3 - CSS Styling: Homepage */
 .home-container {
   width: 100%;
   max-width: 560px;
