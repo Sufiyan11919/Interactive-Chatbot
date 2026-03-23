@@ -9,62 +9,59 @@ const fileNameSpan = document.getElementById("file-name");
 const docsList = document.getElementById("docs-list");
 const emptyDocs = document.getElementById("empty-docs");
 
-// Assignment 1, Step 2 - sendMessage() function
+// Step 2: Helper — append a message bubble to the chat window
+function appendMessage(role, text) {
+  const div = document.createElement("div");
+  div.classList.add("message", role);
+  div.textContent = text;
+  messagesContainer.appendChild(div);
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// Step 3: sendMessage — POST to /chat with participantID, display bot response
 function sendMessage() {
-  const text = inputField.value.trim();
+  const text          = inputField.value.trim();
+  const participantID = localStorage.getItem("participantID") || "anonymous";
 
   if (!text) {
     alert("Please enter a message.");
     return;
   }
 
-  const msgDiv = document.createElement("div");
-  msgDiv.classList.add("message", "user");
-  msgDiv.textContent = text;
-  messagesContainer.appendChild(msgDiv);
-
-  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  appendMessage("user", text);
   inputField.value = "";
 
-  // Assignment 2 - Send message and retrieval method to backend server via fetch
   const selectedMethod = retrievalMethod.value;
 
   fetch("/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: text, retrievalMethod: selectedMethod })
-  }).then(function (response) {
-      return response.json();
-    }).then(function (data) {
-      // testing console response
+    body: JSON.stringify({ message: text, participantID, retrievalMethod: selectedMethod })
+  })
+    .then(function (response) { return response.json(); })
+    .then(function (data) {
       console.log("Server response:", data);
-
-      // Displaying bot response in chat window
-      const botDiv = document.createElement("div");
-      botDiv.classList.add("message", "bot");
-      botDiv.textContent = 'Bot: "' + data.botResponse + '"';
-      messagesContainer.appendChild(botDiv);
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }).catch(function (error) {
-      console.error("Error sending message:", error);
-    });
+      if (data.error) {
+        appendMessage("system", "Error: " + data.error);
+      } else {
+        appendMessage("bot", 'Bot: "' + data.botResponse + '"');
+      }
+    })
+    .catch(function (error) { console.error("Error sending message:", error); });
 }
 
-// Assignment 1, Step 3 - Click listener on send button
+// Step 4: Click listener on send button
 sendBtn.addEventListener("click", sendMessage);
 
-// Assignment 1, Step 4 - Enter key listener on input field
+// Step 5: Enter key listener
 inputField.addEventListener("keydown", function (e) {
-  if (e.key === "Enter") {
-    sendMessage();
-  }
+  if (e.key === "Enter") { sendMessage(); }
 });
 
-// Assignment 1, Step 5 - Change listener for retrieval dropdown
+// Step 6: Retrieval method dropdown
 retrievalMethod.addEventListener("change", function () {
   const selected = retrievalMethod.value;
   console.log("Retrieval method: " + selected);
-
   const msgDiv = document.createElement("div");
   msgDiv.classList.add("message", "system");
   msgDiv.textContent = "Retrieval method changed to: " + selected;
@@ -72,26 +69,23 @@ retrievalMethod.addEventListener("change", function () {
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
 });
 
-fileInput.addEventListener("change", function () {
-  if (fileInput.files.length > 0) {
-    fileNameSpan.textContent = fileInput.files[0].name;
-  } else {
-    fileNameSpan.textContent = "No file chosen";
-  }
-});
-
-// Assignment 1, Step 6 - Upload button logs selected file and adds to document list
+// Step 7: Upload button
 uploadBtn.addEventListener("click", function () {
   if (fileInput.files.length > 0) {
     const name = fileInput.files[0].name;
-
     const li = document.createElement("li");
     li.textContent = name;
     docsList.appendChild(li);
-
     emptyDocs.style.display = "none";
     console.log("Selected file: " + name);
   } else {
     console.log("No file chosen");
   }
+});
+
+// Step 8: File input change
+fileInput.addEventListener("change", function () {
+  fileNameSpan.textContent = fileInput.files.length > 0
+    ? fileInput.files[0].name
+    : "No file chosen";
 });
