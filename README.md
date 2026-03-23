@@ -86,6 +86,14 @@ Example response:
 }
 ```
 
+## MongoDB Atlas Screenshots
+
+### Interactions Collection
+![Interactions Collection](screenshots/interactions.png)
+
+### Event Logs Collection
+![Event Logs Collection](screenshots/eventlogs.png)
+
 ## Scripts
 
 - `npm start` - start the Express server
