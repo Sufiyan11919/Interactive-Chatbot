@@ -51,7 +51,33 @@ app.post("/chat", async (req, res) => {
   }
 });
 
-// Start the server on port 3000
+// POST /log-event — log a user interaction event to MongoDB
+app.post("/log-event", async (req, res) => {
+  const { participantID, eventType, elementName } = req.body;
+
+  try {
+    await EventLog.create({ participantID, eventType, elementName });
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Event log error:", err.message);
+    res.status(500).json({ error: "Failed to log event." });
+  }
+});
+
+// POST /history — return a participant's full chat history
+app.post("/history", async (req, res) => {
+  const { participantID } = req.body;
+
+  try {
+    const interactions = await Interaction.find({ participantID }).sort({ timestamp: 1 });
+    res.json({ history: interactions });
+  } catch (err) {
+    console.error("History error:", err.message);
+    res.status(500).json({ error: "Failed to retrieve history." });
+  }
+});
+
+// ── Start server ─────────────────────────────────────────────────────────────
 app.listen(3000, () => {
   console.log("Server is running on http://localhost:3000");
 });
