@@ -1,5 +1,3 @@
-/* Assignment 1 - CSS Styling: Roboto font, two-column layout, scrollable chat area */
-
 * {
   margin: 0;
   padding: 0;
@@ -8,21 +6,18 @@
 
 body {
   font-family: "Roboto", sans-serif;
-  background:
-    radial-gradient(circle at top left, rgba(2, 123, 255, 0.12), transparent 32%),
-    linear-gradient(180deg, #f7f9fc 0%, #eef2f7 100%);
+  background-color: #f0f2f5;
   min-height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
   padding: 20px;
-  color: #111827;
 }
 
 .app-container {
   display: flex;
   align-items: stretch;
-  gap: 18px;
+  gap: 16px;
   width: 92%;
   max-width: 1200px;
   min-height: 85vh;
@@ -45,137 +40,6 @@ body {
   margin-bottom: 10px;
 }
 
-.btn {
-  border: none;
-  border-radius: 6px;
-  padding: 10px 18px;
-  font-weight: 600;
-  cursor: pointer;
-  font-family: "Roboto", sans-serif;
-  transition:
-    transform 0.18s ease,
-    box-shadow 0.18s ease,
-    background-color 0.18s ease;
-}
-
-.btn:hover {
-  transform: translateY(-1px);
-}
-
-.btn:focus-visible,
-.file-label:focus-visible,
-#user-input:focus-visible,
-#retrieval-method:focus-visible {
-  outline: 3px solid rgba(2, 123, 255, 0.2);
-  outline-offset: 2px;
-}
-
-.btn-primary {
-  background: #027bff;
-  color: #fff;
-  padding: 10px 22px;
-  box-shadow: 0 8px 18px rgba(2, 123, 255, 0.2);
-}
-
-.btn-primary:hover {
-  background: #0262cc;
-  box-shadow: 0 12px 24px rgba(2, 123, 255, 0.25);
-}
-
-/* ---------- Right Panel: Chat ---------- */
-#chat-container {
-  flex: 1;
-  min-width: 300px;
-  background-color: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.1);
-  display: flex;
-  flex-direction: column;
-  padding: 22px;
-  backdrop-filter: blur(8px);
-}
-
-#messages {
-  flex: 1;
-  overflow-y: auto;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: linear-gradient(180deg, #f9fafb 0%, #f3f6f9 100%);
-  padding: 14px;
-  scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
-}
-
-#messages::-webkit-scrollbar {
-  width: 10px;
-}
-
-#messages::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-.input-area {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-  margin-top: 16px;
-}
-
-#user-input {
-  flex: 1;
-  height: 48px;
-  padding: 0 14px;
-  border: 1px solid #d1d5db;
-  border-radius: 8px;
-  font-size: 1rem;
-  outline: none;
-  background-color: #fff;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
-}
-
-#user-input:focus {
-  border-color: #027bff;
-  box-shadow: 0 0 0 4px rgba(2, 123, 255, 0.08);
-}
-
-.message {
-  max-width: 70%;
-  padding: 11px 14px;
-  border-radius: 14px;
-  font-size: 0.95rem;
-  line-height: 1.5;
-  word-wrap: break-word;
-  margin-bottom: 10px;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
-}
-
-.message.user {
-  margin-left: auto;
-  background-color: #1a73e8;
-  color: #fff;
-  border-bottom-right-radius: 2px;
-}
-
-/* bot response css here */
-.message.bot {
-  margin-right: auto;
-  background-color: #d4edda;
-  color: #155724;
-  border-bottom-left-radius: 2px;
-}
-
-.message.system {
-  margin-right: auto;
-  background-color: #e8e8e8;
-  color: #333;
-  border-bottom-left-radius: 2px;
-}
-
-/* ---------- Left Panel: Document Upload ---------- */
 .card {
   background: rgb(248, 249, 250);
   border: 1px solid #e5e7eb;
@@ -183,18 +47,36 @@ body {
   padding: 18px;
 }
 
+.btn {
+  border: none;
+  border-radius: 6px;
+  padding: 10px 18px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: "Roboto", sans-serif;
+}
+
 .btn-success {
   background: rgb(40, 167, 68);
   color: #fff;
   width: 120px;
-  box-shadow: 0 8px 18px rgba(40, 167, 68, 0.18);
 }
 
 .btn-success:hover {
   background: rgb(32, 140, 56);
-  box-shadow: 0 12px 24px rgba(32, 140, 56, 0.22);
 }
 
+.btn-primary {
+  background: #027bff;
+  color: #fff;
+  padding: 10px 22px;
+}
+
+.btn-primary:hover {
+  background: #0262cc;
+}
+
+/* ---------- Left Panel ---------- */
 #doc-panel {
   width: 360px;
   flex-shrink: 0;
@@ -202,12 +84,11 @@ body {
   background-color: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
-  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.1);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
   padding: 22px;
   display: flex;
   flex-direction: column;
   gap: 18px;
-  backdrop-filter: blur(8px);
 }
 
 #upload-form {
@@ -220,7 +101,6 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-width: 0;
 }
 
 #file-input {
@@ -235,20 +115,13 @@ body {
   font-size: 0.85rem;
   cursor: pointer;
   white-space: nowrap;
-  transition:
-    background-color 0.18s ease,
-    border-color 0.18s ease,
-    box-shadow 0.18s ease;
 }
 
 .file-label:hover {
   background: #f3f4f6;
-  border-color: #9ca3af;
 }
 
 #file-name {
-  flex: 1;
-  min-width: 0;
   font-size: 0.85rem;
   color: #6b7280;
   overflow: hidden;
@@ -282,7 +155,6 @@ body {
   padding: 10px 12px;
   font-size: 0.95rem;
   color: #111827;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
 }
 
 .retrieval-card {
@@ -297,59 +169,83 @@ body {
   border-radius: 6px;
   font-size: 0.95rem;
   background: #fff;
+}
+
+/* ---------- Right Panel ---------- */
+#chat-container {
+  flex: 1;
+  min-width: 300px;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  padding: 22px;
+}
+
+#messages {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: rgb(248, 249, 250);
+  padding: 14px;
+}
+
+.input-area {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+#user-input {
+  flex: 1;
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
   outline: none;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
-#retrieval-method:focus {
+#user-input:focus {
   border-color: #027bff;
-  box-shadow: 0 0 0 4px rgba(2, 123, 255, 0.08);
 }
 
-/* ---------- Responsive ---------- */
-@media (max-width: 900px) {
-  .app-container {
-    flex-direction: column;
-    align-items: stretch;
-    width: 96%;
-  }
-
-  #doc-panel {
-    width: 100%;
-    align-self: stretch;
-  }
-
-  #chat-container {
-    min-width: unset;
-    min-height: 60vh;
-  }
+.message {
+  max-width: 70%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  word-wrap: break-word;
+  margin-bottom: 10px;
 }
 
-@media (max-width: 560px) {
-  body {
-    padding: 12px;
-  }
-
-  #chat-container,
-  #doc-panel {
-    padding: 16px;
-  }
-
-  .message {
-    max-width: 85%;
-  }
-
-  .input-area {
-    gap: 10px;
-  }
-
-  .btn-primary,
-  .btn-success {
-    width: 100%;
-  }
+.message.user {
+  margin-left: auto;
+  background-color: #1a73e8;
+  color: #fff;
+  border-bottom-right-radius: 2px;
 }
 
-/* Assignment 3 - CSS Styling: Homepage */
+.message.bot {
+  margin-right: auto;
+  background-color: #d4edda;
+  color: #155724;
+  border-bottom-left-radius: 2px;
+}
+
+.message.system {
+  margin-right: auto;
+  background-color: #e8e8e8;
+  color: #333;
+  border-bottom-left-radius: 2px;
+}
+
+/* ---------- Homepage ---------- */
 .home-container {
   width: 100%;
   max-width: 560px;
@@ -397,16 +293,33 @@ body {
   font-size: 1rem;
   font-family: "Roboto", sans-serif;
   outline: none;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .participant-card input:focus {
   border-color: #027bff;
-  box-shadow: 0 0 0 4px rgba(2, 123, 255, 0.08);
 }
 
 .participant-card .btn {
   width: 100%;
   height: 48px;
   font-size: 1rem;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 900px) {
+  .app-container {
+    flex-direction: column;
+    align-items: stretch;
+    width: 96%;
+  }
+
+  #doc-panel {
+    width: 100%;
+    align-self: stretch;
+  }
+
+  #chat-container {
+    min-width: unset;
+    min-height: 60vh;
+  }
 }
