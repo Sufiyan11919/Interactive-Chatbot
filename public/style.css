@@ -47,6 +47,12 @@ body {
   padding: 18px;
 }
 
+.helper-text {
+  color: #6b7280;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
 .btn {
   border: none;
   border-radius: 6px;
@@ -155,6 +161,7 @@ body {
   padding: 10px 12px;
   font-size: 0.95rem;
   color: #111827;
+  line-height: 1.4;
 }
 
 .retrieval-card {

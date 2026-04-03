@@ -40,6 +40,38 @@ function appendMessage(role, text) {
   });
 }
 
+// RAG:Part4 - Document Listing (for UI): render the uploaded document list from MongoDB so the left panel reflects processed files.
+function renderDocuments(documents) {
+  docsList.innerHTML = "";
+
+  if (!documents || documents.length === 0) {
+    emptyDocs.style.display = "block";
+    return;
+  }
+
+  emptyDocs.style.display = "none";
+
+  documents.forEach(function (doc) {
+    const li = document.createElement("li");
+    const processedAt = doc.processedAt
+      ? new Date(doc.processedAt).toLocaleString()
+      : "Not processed yet";
+    li.textContent = doc.filename + " (" + doc.processingStatus + ") - " + processedAt;
+    docsList.appendChild(li);
+  });
+}
+
+// RAG:Part4 - Document Listing (for UI): fetch the current document inventory for the upload panel.
+async function loadDocuments() {
+  try {
+    const response = await fetch("/documents");
+    const data = await response.json();
+    renderDocuments(data.documents || []);
+  } catch (err) {
+    console.error("Error loading documents:", err);
+  }
+}
+
 // ── Step 5: Load chat history for this participant on page load ───────────────
 fetch("/history", {
   method: "POST",
@@ -124,19 +156,44 @@ retrievalMethod.addEventListener("change", function () {
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
 });
 
-// ── Step 11: Upload button — click listener + event log ──────────────────────
-uploadBtn.addEventListener("click", function () {
+// RAG:Part4 - Document Upload + Storage (MongoDB): send the selected document to the backend for processing, chunking, embedding, and storage.
+uploadBtn.addEventListener("click", async function () {
   logEvent("click", "upload-btn");
 
-  if (fileInput.files.length > 0) {
-    const name = fileInput.files[0].name;
-    const li = document.createElement("li");
-    li.textContent = name;
-    docsList.appendChild(li);
-    emptyDocs.style.display = "none";
-    console.log("Selected file: " + name);
-  } else {
-    console.log("No file chosen");
+  if (fileInput.files.length === 0) {
+    alert("Please choose a TXT or PDF document first.");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("document", fileInput.files[0]);
+
+  uploadBtn.disabled = true;
+
+  try {
+    const response = await fetch("/upload-document", {
+      method: "POST",
+      body: formData
+    });
+    const data = await response.json();
+
+    if (!response.ok || data.error) {
+      appendMessage("system", "Upload error: " + (data.error || "Failed to upload document."));
+      return;
+    }
+
+    fileInput.value = "";
+    fileNameSpan.textContent = "No file chosen";
+    appendMessage(
+      "system",
+      "Uploaded " + data.document.filename + " with " + data.document.chunkCount + " processed chunks."
+    );
+  } catch (error) {
+    console.error("Upload error:", error);
+    appendMessage("system", "Upload error: Failed to upload document.");
+  } finally {
+    uploadBtn.disabled = false;
+    await loadDocuments();
   }
 });
 
@@ -153,3 +210,5 @@ fileInput.addEventListener("change", function () {
 messagesContainer.addEventListener("mouseenter", function () {
   logEvent("hover", "messages-container");
 });
+
+loadDocuments();
