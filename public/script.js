@@ -1,10 +1,8 @@
-// ── Step 1: Guard — redirect to homepage if no participantID ─────────────────
 const participantID = localStorage.getItem("participantID");
 if (!participantID) {
   window.location.href = "/";
 }
 
-// ── Step 2: DOM references ────────────────────────────────────────────────────
 const inputField = document.getElementById("user-input");
 const sendBtn = document.getElementById("send-btn");
 const messagesContainer = document.getElementById("messages");
@@ -15,7 +13,6 @@ const fileNameSpan = document.getElementById("file-name");
 const docsList = document.getElementById("docs-list");
 const emptyDocs = document.getElementById("empty-docs");
 
-// ── Step 3: Helper — log an event to /log-event ───────────────────────────────
 function logEvent(eventType, elementName) {
   fetch("/log-event", {
     method: "POST",
@@ -26,21 +23,25 @@ function logEvent(eventType, elementName) {
   });
 }
 
-// ── Step 4: Helper — append a message bubble to the chat window ───────────────
+function scrollMessagesToBottom() {
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function attachHoverLogging(element, role) {
+  element.addEventListener("mouseenter", function () {
+    logEvent("hover", "message-" + role);
+  });
+}
+
 function appendMessage(role, text) {
   const div = document.createElement("div");
   div.classList.add("message", role);
   div.textContent = text;
   messagesContainer.appendChild(div);
-  messagesContainer.scrollTop = messagesContainer.scrollHeight;
-
-  // Log hover events on each message bubble
-  div.addEventListener("mouseenter", function () {
-    logEvent("hover", "message-" + role);
-  });
+  scrollMessagesToBottom();
+  attachHoverLogging(div, role);
 }
 
-// RAG:Part4 - Document Listing (for UI): render the uploaded document list from MongoDB so the left panel reflects processed files.
 function renderDocuments(documents) {
   docsList.innerHTML = "";
 
@@ -61,41 +62,37 @@ function renderDocuments(documents) {
   });
 }
 
-// RAG:Part4 - Document Listing (for UI): fetch the current document inventory for the upload panel.
 async function loadDocuments() {
   try {
     const response = await fetch("/documents");
     const data = await response.json();
     renderDocuments(data.documents || []);
-  } catch (err) {
-    console.error("Error loading documents:", err);
+  } catch (error) {
+    console.error("Error loading documents:", error);
   }
 }
 
-// ── Step 5: Load chat history for this participant on page load ───────────────
-fetch("/history", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ participantID })
-})
-  .then(function (response) {
-    return response.json();
-  })
-  .then(function (data) {
+async function loadHistory() {
+  try {
+    const response = await fetch("/history", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ participantID })
+    });
+    const data = await response.json();
+
     if (data.history && data.history.length > 0) {
       data.history.forEach(function (entry) {
         appendMessage("user", entry.userInput);
-        appendMessage("bot", "Bot: \"" + entry.botResponse + "\"");
+        appendMessage("bot", 'Bot: "' + entry.botResponse + '"');
       });
-      console.log("Chat history loaded for:", participantID);
     }
-  })
-  .catch(function (err) {
-    console.error("Error loading history:", err);
-  });
+  } catch (error) {
+    console.error("Error loading history:", error);
+  }
+}
 
-// ── Step 6: sendMessage — POST to /chat and display bot response ──────────────
-function sendMessage() {
+async function sendMessage() {
   const text = inputField.value.trim();
 
   if (!text) {
@@ -106,57 +103,52 @@ function sendMessage() {
   appendMessage("user", text);
   inputField.value = "";
 
-  const selectedMethod = retrievalMethod.value;
+  try {
+    const response = await fetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        input: text,
+        message: text,
+        participantID: participantID,
+        retrievalMethod: retrievalMethod.value,
+      }),
+    });
+    const data = await response.json();
 
-  fetch("/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: text, participantID, retrievalMethod: selectedMethod })
-  })
-    .then(function (response) { return response.json(); })
-    .then(function (data) {
-      console.log("Server response:", data);
-      if (data.error) {
-        appendMessage("system", "Error: " + data.error);
-      } else {
-        appendMessage("bot", "Bot: \"" + data.botResponse + "\"");
-      }
-    })
-    .catch(function (error) { console.error("Error sending message:", error); });
+    if (!response.ok || data.error) {
+      appendMessage("system", "Error: " + (data.error || "Failed to get a response."));
+      return;
+    }
+
+    appendMessage("bot", 'Bot: "' + data.botResponse + '"');
+  } catch (error) {
+    console.error("Error sending message:", error);
+    appendMessage("system", "Error: Failed to get a response.");
+  }
 }
 
-// ── Step 7: Send button — click listener + event log ─────────────────────────
 sendBtn.addEventListener("click", function () {
   logEvent("click", "send-btn");
   sendMessage();
 });
 
-// ── Step 8: Enter key listener ────────────────────────────────────────────────
 inputField.addEventListener("keydown", function (e) {
   if (e.key === "Enter") {
     sendMessage();
   }
 });
 
-// ── Step 9: Focus event on text input ────────────────────────────────────────
 inputField.addEventListener("focus", function () {
   logEvent("focus", "user-input");
 });
 
-// ── Step 10: Retrieval method dropdown — change listener ─────────────────────
 retrievalMethod.addEventListener("change", function () {
   const selected = retrievalMethod.value;
-  console.log("Retrieval method: " + selected);
   logEvent("click", "retrieval-method");
-
-  const msgDiv = document.createElement("div");
-  msgDiv.classList.add("message", "system");
-  msgDiv.textContent = "Retrieval method changed to: " + selected;
-  messagesContainer.appendChild(msgDiv);
-  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  appendMessage("system", "Retrieval method changed to: " + selected);
 });
 
-// RAG:Part4 - Document Upload + Storage (MongoDB): send the selected document to the backend for processing, chunking, embedding, and storage.
 uploadBtn.addEventListener("click", async function () {
   logEvent("click", "upload-btn");
 
@@ -173,7 +165,7 @@ uploadBtn.addEventListener("click", async function () {
   try {
     const response = await fetch("/upload-document", {
       method: "POST",
-      body: formData
+      body: formData,
     });
     const data = await response.json();
 
@@ -197,18 +189,15 @@ uploadBtn.addEventListener("click", async function () {
   }
 });
 
-// ── Step 12: File input — change listener ────────────────────────────────────
 fileInput.addEventListener("change", function () {
-  if (fileInput.files.length > 0) {
-    fileNameSpan.textContent = fileInput.files[0].name;
-  } else {
-    fileNameSpan.textContent = "No file chosen";
-  }
+  fileNameSpan.textContent = fileInput.files.length > 0
+    ? fileInput.files[0].name
+    : "No file chosen";
 });
 
-// ── Step 13: Hover event on the messages container ───────────────────────────
 messagesContainer.addEventListener("mouseenter", function () {
   logEvent("hover", "messages-container");
 });
 
 loadDocuments();
+loadHistory();

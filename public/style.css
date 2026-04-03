@@ -245,11 +245,80 @@ body {
   border-bottom-left-radius: 2px;
 }
 
+.message.bot.bot-response {
+  max-width: 85%;
+  padding: 14px 16px;
+}
+
 .message.system {
   margin-right: auto;
   background-color: #e8e8e8;
   color: #333;
   border-bottom-left-radius: 2px;
+}
+
+.message-text {
+  white-space: pre-wrap;
+}
+
+.method-badge {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(21, 87, 36, 0.12);
+  color: #155724;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.confidence-section,
+.evidence-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(21, 87, 36, 0.18);
+}
+
+.detail-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #155724;
+  margin-bottom: 8px;
+}
+
+.detail-empty {
+  color: #4b5563;
+  font-size: 0.9rem;
+}
+
+.confidence-row {
+  font-size: 0.9rem;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.evidence-item {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(21, 87, 36, 0.16);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+
+.evidence-meta {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #166534;
+  margin-bottom: 6px;
+}
+
+.evidence-text {
+  color: #1f2937;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
 }
 
 /* ---------- Homepage ---------- */
