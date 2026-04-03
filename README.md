@@ -94,6 +94,12 @@ Example response:
 ### Event Logs Collection
 ![Event Logs Collection](screenshots/eventlogs.png)
 
+### Part 4 — Document Collection
+![Document Collection](screenshots/part4_documents.png)
+
+### Part 4 — Interaction with Retrieval Evidence + Confidence
+![Interaction with Evidence and Confidence](screenshots/part4_interaction.png)
+
 ## Scripts
 
 - `npm start` - start the Express server
