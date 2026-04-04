@@ -1,20 +1,23 @@
 # Interactive Chatbot
 
-A simple chatbot interface built with `Node.js`, `Express`, and vanilla HTML/CSS/JavaScript.
+Part 4 of the chatbot project extends the app into a Retrieval-Augmented Generation (RAG) system built with Node.js, Express, MongoDB, and OpenAI.
 
-The app currently provides:
+The app supports:
 
-- A two-panel UI for chat and document management
-- A chat input that sends messages to an Express backend
-- A retrieval method selector with `semantic` and `tfidf` options
-- A document upload panel that displays selected filenames in the UI
-
-The backend is intentionally minimal at this stage. The `/chat` route accepts a message and retrieval method, logs them, and returns a placeholder bot response.
+- uploading TXT and PDF documents from the left panel
+- processing documents into chunks and storing them in MongoDB
+- generating embeddings for semantic retrieval
+- retrieving evidence with either `semantic` or `tfidf`
+- grounding chatbot responses in retrieved document chunks
+- displaying retrieved evidence and confidence metrics in the chat UI
+- storing interactions, retrieval evidence, confidence data, and event logs in MongoDB
 
 ## Tech Stack
 
 - Node.js
 - Express
+- MongoDB with Mongoose
+- OpenAI API
 - Vanilla JavaScript
 - HTML/CSS
 
@@ -22,29 +25,55 @@ The backend is intentionally minimal at this stage. The `/chat` route accepts a 
 
 ```text
 Interactive-Chatbot/
+├── models/
+│   ├── Document.js
+│   ├── EventLog.js
+│   └── Interaction.js
 ├── public/
+│   ├── chat.html
+│   ├── home.js
 │   ├── index.html
 │   ├── script.js
 │   └── style.css
+├── screenshots/
+├── services/
+│   ├── confidenceCalculator.js
+│   ├── documentProcessor.js
+│   ├── embeddingService.js
+│   └── retrievalService.js
+├── utils/
+│   ├── textUtils.js
+│   └── vectorUtils.js
 ├── server.js
 ├── package.json
 └── README.md
 ```
 
-## Getting Started
+## Setup
 
 ### Prerequisites
 
 - Node.js 18+ recommended
 - npm
+- a MongoDB connection string
+- an OpenAI API key
 
-### Install dependencies
+### Environment Variables
+
+Create a `.env` file with:
+
+```env
+MONGO_URI=your_mongodb_connection_string
+OPENAI_API_KEY=your_openai_api_key
+```
+
+### Install Dependencies
 
 ```bash
 npm install
 ```
 
-### Run the app
+### Run the App
 
 For normal use:
 
@@ -52,7 +81,7 @@ For normal use:
 npm start
 ```
 
-For development with auto-restart:
+For development:
 
 ```bash
 npm run dev
@@ -64,29 +93,62 @@ The server runs on:
 http://localhost:3000
 ```
 
-## API
+## Core Routes
+
+### `GET /documents`
+
+Returns the uploaded documents stored in MongoDB.
+
+### `POST /upload-document`
+
+Accepts a TXT or PDF file, extracts text, chunks it, generates embeddings, stores the processed document, and rebuilds the TF-IDF index.
 
 ### `POST /chat`
 
-Request body:
+Accepts:
 
 ```json
 {
-  "message": "Hello",
+  "participantID": "user-1",
+  "message": "What does the uploaded document say?",
   "retrievalMethod": "semantic"
 }
 ```
 
-Example response:
+Returns a grounded chatbot response plus retrieved evidence and confidence metrics.
 
-```json
-{
-  "userMessage": "Hello",
-  "botResponse": "Message Received!"
-}
-```
+### `POST /history`
 
-## MongoDB Atlas Screenshots
+Returns the saved interaction history for a participant.
+
+### `POST /log-event`
+
+Stores UI interaction events such as clicks, focus, and hover events.
+
+## Part 4 Features
+
+### Document Upload and Storage
+
+- uploaded documents are stored in the `Document` collection
+- processed chunks and chunk embeddings are saved for retrieval
+
+### Retrieval Methods
+
+- `semantic` uses embeddings
+- `tfidf` uses keyword-based retrieval
+
+### RAG Chat
+
+- each prompt retrieves top relevant chunks
+- retrieved evidence is added to the OpenAI prompt before response generation
+
+### Explainability and Confidence
+
+- the UI displays retrieved document chunks and relevance scores
+- the UI displays confidence metrics derived from the retrieved evidence
+- interactions store retrieval evidence and confidence fields in MongoDB
+
+## MongoDB Screenshots
 
 ### Interactions Collection
 ![Interactions Collection](screenshots/interactions.png)
@@ -94,13 +156,13 @@ Example response:
 ### Event Logs Collection
 ![Event Logs Collection](screenshots/eventlogs.png)
 
-### Part 4 — Document Collection
+### Part 4 Document Collection
 ![Document Collection](screenshots/part4_documents.png)
 
-### Part 4 — Interaction with Retrieval Evidence + Confidence
+### Part 4 Interaction with Retrieval Evidence and Confidence
 ![Interaction with Evidence and Confidence](screenshots/part4_interaction.png)
 
 ## Scripts
 
-- `npm start` - start the Express server
-- `npm run dev` - start the server with `nodemon`
+- `npm start` runs the Express server
+- `npm run dev` runs the server with `nodemon`
