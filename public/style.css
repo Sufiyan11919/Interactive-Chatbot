@@ -20,7 +20,8 @@ body {
   gap: 16px;
   width: 92%;
   max-width: 1200px;
-  min-height: 85vh;
+  height: 85vh;
+  min-height: 0;
 }
 
 /* ---------- Shared ---------- */
@@ -86,7 +87,6 @@ body {
 #doc-panel {
   width: 360px;
   flex-shrink: 0;
-  align-self: flex-start;
   background-color: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
@@ -95,6 +95,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 #upload-form {
@@ -182,6 +184,7 @@ body {
 #chat-container {
   flex: 1;
   min-width: 300px;
+  min-height: 0;
   background-color: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
@@ -189,6 +192,7 @@ body {
   display: flex;
   flex-direction: column;
   padding: 22px;
+  overflow: hidden;
 }
 
 /* In-Class Assignment: Handling Multiple Participants and Conversation History with Baseline Prototype */
@@ -237,6 +241,11 @@ body {
 
 #messages {
   flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
   overflow-y: auto;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
@@ -266,24 +275,24 @@ body {
 }
 
 .message {
+  width: fit-content;
   max-width: 70%;
   padding: 10px 14px;
   border-radius: 12px;
   font-size: 0.95rem;
   line-height: 1.4;
   word-wrap: break-word;
-  margin-bottom: 10px;
 }
 
 .message.user {
-  margin-left: auto;
+  align-self: flex-end;
   background-color: #1a73e8;
   color: #fff;
   border-bottom-right-radius: 2px;
 }
 
 .message.bot {
-  margin-right: auto;
+  align-self: flex-start;
   background-color: #d4edda;
   color: #155724;
   border-bottom-left-radius: 2px;
@@ -295,7 +304,7 @@ body {
 }
 
 .message.system {
-  margin-right: auto;
+  align-self: flex-start;
   background-color: #e8e8e8;
   color: #333;
   border-bottom-left-radius: 2px;
@@ -431,16 +440,19 @@ body {
     flex-direction: column;
     align-items: stretch;
     width: 96%;
+    height: auto;
   }
 
   #doc-panel {
     width: 100%;
-    align-self: stretch;
+    max-height: none;
+    overflow: visible;
   }
 
   #chat-container {
     min-width: unset;
     min-height: 60vh;
+    max-height: 70vh;
   }
 
   .chat-header {
