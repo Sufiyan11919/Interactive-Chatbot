@@ -1,29 +1,44 @@
 // Assignment 3 - Save Participant ID to localStorage and navigate to chatbot
-const startBtn         = document.getElementById("start-btn");
-const participantInput = document.getElementById("participant-id");
+const participantForm = document.getElementById("participant-form");
+const participantInput = document.getElementById("participantID");
 
-// Pre-fill if a Participant ID is already saved
-const saved = localStorage.getItem("participantID");
-if (saved) {
-  participantInput.value = saved;
+// In-Class Assignment: Handling Multiple Participants and Conversation History with Baseline Prototype
+function deriveSystemID(participantID) {
+  const numericMatch = String(participantID).match(/\d+/);
+
+  if (!numericMatch) {
+    return 1;
+  }
+
+  return Number.parseInt(numericMatch[0], 10) % 2 === 0 ? 2 : 1;
 }
 
-function startChat() {
-  const id = participantInput.value.trim();
-  if (!id) {
+// Pre-fill if a Participant ID is already saved
+const savedParticipantID = localStorage.getItem("participantID");
+if (savedParticipantID) {
+  participantInput.value = savedParticipantID;
+}
+
+// Form submit listener
+participantForm.addEventListener("submit", function (event) {
+  event.preventDefault();
+
+  const participantID = participantInput.value.trim();
+  if (!participantID) {
     alert("Please enter a Participant ID.");
     return;
   }
-  localStorage.setItem("participantID", id);
-  window.location.href = "/chat.html";
-}
 
-// Click listener
-startBtn.addEventListener("click", startChat);
+  const systemID = deriveSystemID(participantID);
 
-// Enter key listener
-participantInput.addEventListener("keydown", function (e) {
-  if (e.key === "Enter") {
-    startChat();
-  }
+  localStorage.setItem("participantID", participantID);
+
+  const destination = systemID === 2 ? "/enhanced.html" : "/chat.html";
+
+  window.location.href =
+    destination +
+    "?participantID=" +
+    encodeURIComponent(participantID) +
+    "&systemID=" +
+    systemID;
 });

@@ -1,26 +1,115 @@
+(function () {
+const HISTORY_LIMIT = 5;
+const urlParams = new URLSearchParams(window.location.search);
+
 // ── Step 1: Guard — redirect to homepage if no participantID ─────────────────
-const participantID = localStorage.getItem("participantID");
-if (!participantID) {
-  window.location.href = "/";
+// In-Class Assignment: Handling Multiple Participants and Conversation History with Baseline Prototype
+function deriveSystemID(participantID) {
+  const numericMatch = String(participantID || "").match(/\d+/);
+
+  if (!numericMatch) {
+    return 1;
+  }
+
+  return Number.parseInt(numericMatch[0], 10) % 2 === 0 ? 2 : 1;
 }
 
+function resolveParticipantID() {
+  const participantFromUrl = String(urlParams.get("participantID") || "").trim();
+  const participantFromStorage = String(localStorage.getItem("participantID") || "").trim();
+  const resolvedParticipantID = participantFromUrl || participantFromStorage;
+
+  if (resolvedParticipantID) {
+    localStorage.setItem("participantID", resolvedParticipantID);
+  }
+
+  return resolvedParticipantID;
+}
+
+function resolveSystemID(participantID) {
+  const systemFromUrl = Number.parseInt(urlParams.get("systemID"), 10);
+
+  if (systemFromUrl === 1 || systemFromUrl === 2) {
+    return systemFromUrl;
+  }
+
+  return deriveSystemID(participantID);
+}
+
+const participantID = resolveParticipantID();
+if (!participantID) {
+  alert("Please enter a participant ID.");
+  window.location.replace("/");
+  return;
+}
+
+const systemID = resolveSystemID(participantID);
+
+if (systemID === 2) {
+  window.location.replace(
+    "/enhanced.html?participantID=" +
+      encodeURIComponent(participantID) +
+      "&systemID=2"
+  );
+  return;
+}
+
+const normalizedUrl = new URL(window.location.href);
+normalizedUrl.searchParams.set("participantID", participantID);
+normalizedUrl.searchParams.set("systemID", String(systemID));
+window.history.replaceState({}, "", normalizedUrl.pathname + normalizedUrl.search);
+
 // ── Step 2: DOM references ────────────────────────────────────────────────────
-const inputField        = document.getElementById("user-input");
-const sendBtn           = document.getElementById("send-btn");
+const inputField = document.getElementById("user-input");
+const sendBtn = document.getElementById("send-btn");
 const messagesContainer = document.getElementById("messages");
-const retrievalMethod   = document.getElementById("retrieval-method");
-const uploadBtn         = document.getElementById("upload-btn");
-const fileInput         = document.getElementById("file-input");
-const fileNameSpan      = document.getElementById("file-name");
-const docsList          = document.getElementById("docs-list");
-const emptyDocs         = document.getElementById("empty-docs");
+const retrievalMethod = document.getElementById("retrieval-method");
+const uploadBtn = document.getElementById("upload-btn");
+const fileInput = document.getElementById("file-input");
+const fileNameSpan = document.getElementById("file-name");
+const docsList = document.getElementById("docs-list");
+const emptyDocs = document.getElementById("empty-docs");
+const chatSessionMeta = document.getElementById("chat-session-meta");
+const systemBadge = document.getElementById("system-badge");
+const systemNotice = document.getElementById("system-notice");
+
+// In-Class Assignment: keep only the most recent conversation turns in memory.
+let conversationHistory = [];
+
+function getRecentConversationHistory() {
+  return conversationHistory.slice(-HISTORY_LIMIT);
+}
+
+function rememberInteraction(entry) {
+  conversationHistory = getRecentConversationHistory().concat({
+    userInput: entry.userInput,
+    botResponse: entry.botResponse,
+    retrievalMethod: entry.retrievalMethod || "semantic",
+    retrievedDocuments: entry.retrievedDocuments || [],
+    confidenceMetrics: entry.confidenceMetrics || null,
+  });
+}
+
+function initializeSessionInfo() {
+  const systemLabel = systemID === 1 ? "System 1 (baseline)" : "System 2 (placeholder)";
+
+  document.title = "AI Chatbot - " + systemLabel;
+  chatSessionMeta.textContent = "Participant ID: " + participantID;
+  systemBadge.textContent = systemLabel;
+
+  if (systemID === 2) {
+    systemNotice.hidden = false;
+    systemNotice.textContent =
+      "System 2 is using placeholder behavior right now so you can verify routing. The chat flow remains shared with the baseline system.";
+  }
+}
 
 // ── Step 3: Helper — log an event to /log-event ───────────────────────────────
 function logEvent(eventType, elementName) {
   fetch("/log-event", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ participantID, eventType, elementName })
+    body: JSON.stringify({ participantID, systemID, eventType, elementName }),
   }).catch(function (err) {
     console.error("Event log error:", err);
   });
@@ -118,7 +207,7 @@ function createConfidenceSection(confidenceMetrics, retrievalMethodValue) {
     "Overall: " + formatConfidence(confidenceMetrics.overallConfidence),
     "Retrieval: " + formatConfidence(confidenceMetrics.retrievalConfidence),
     "Response: " + formatConfidence(confidenceMetrics.responseConfidence),
-    "Method: " + (confidenceMetrics.retrievalMethod || retrievalMethodValue || "unknown")
+    "Method: " + (confidenceMetrics.retrievalMethod || retrievalMethodValue || "unknown"),
   ];
 
   metrics.forEach(function (metric) {
@@ -175,7 +264,9 @@ function renderDocuments(documents) {
 
 async function loadDocuments() {
   try {
-    const response = await fetch("/documents");
+    const response = await fetch(
+      "/documents?participantID=" + encodeURIComponent(participantID)
+    );
     const data = await response.json();
     const documents = Array.isArray(data) ? data : data.documents;
     renderDocuments(documents || []);
@@ -192,15 +283,16 @@ function renderInteraction(entry) {
     entry.confidenceMetrics || null,
     entry.retrievalMethod || "semantic"
   );
+  rememberInteraction(entry);
 }
 
 // ── Step 5: Load chat history for this participant on page load ───────────────
-async function loadHistory() {
+async function loadConversationHistory() {
   try {
     const response = await fetch("/history", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ participantID })
+      body: JSON.stringify({ participantID, systemID, limit: HISTORY_LIMIT }),
     });
     const data = await response.json();
 
@@ -237,9 +329,11 @@ async function sendMessage() {
       body: JSON.stringify({
         input: text,
         message: text,
-        participantID: participantID,
-        retrievalMethod: selectedMethod
-      })
+        participantID,
+        systemID,
+        retrievalMethod: selectedMethod,
+        conversationHistory: getRecentConversationHistory(),
+      }),
     });
     const data = await response.json();
 
@@ -249,12 +343,21 @@ async function sendMessage() {
       return;
     }
 
+    const interaction = {
+      userInput: text,
+      botResponse: data.botResponse,
+      retrievalMethod: data.retrievalMethod || selectedMethod,
+      retrievedDocuments: data.retrievedDocuments || [],
+      confidenceMetrics: data.confidenceMetrics || null,
+    };
+
     appendBotResponse(
-      data.botResponse,
-      data.retrievedDocuments || [],
-      data.confidenceMetrics || null,
-      data.retrievalMethod || selectedMethod
+      interaction.botResponse,
+      interaction.retrievedDocuments,
+      interaction.confidenceMetrics,
+      interaction.retrievalMethod
     );
+    rememberInteraction(interaction);
   } catch (error) {
     console.error("Error sending message:", error);
     appendMessage("system", "Error: Failed to get a response.");
@@ -286,12 +389,7 @@ retrievalMethod.addEventListener("change", function () {
   const selected = retrievalMethod.value;
   console.log("Retrieval method: " + selected);
   logEvent("click", "retrieval-method");
-
-  const msgDiv = document.createElement("div");
-  msgDiv.classList.add("message", "system");
-  msgDiv.textContent = "Retrieval method changed to: " + selected;
-  messagesContainer.appendChild(msgDiv);
-  scrollMessagesToBottom();
+  appendMessage("system", "Retrieval method changed to: " + selected);
 });
 
 // ── Step 11: Upload button — click listener + event log ──────────────────────
@@ -305,13 +403,14 @@ uploadBtn.addEventListener("click", async function () {
 
   const formData = new FormData();
   formData.append("document", fileInput.files[0]);
+  formData.append("participantID", participantID);
 
   uploadBtn.disabled = true;
 
   try {
     const response = await fetch("/upload-document", {
       method: "POST",
-      body: formData
+      body: formData,
     });
     const data = await response.json();
 
@@ -350,5 +449,7 @@ messagesContainer.addEventListener("mouseenter", function () {
   logEvent("hover", "messages-container");
 });
 
+initializeSessionInfo();
 loadDocuments();
-loadHistory();
+loadConversationHistory();
+})();

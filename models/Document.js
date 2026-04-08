@@ -13,6 +13,8 @@ const chunkSchema = new mongoose.Schema(
 );
 
 const documentSchema = new mongoose.Schema({
+  // In-Class Assignment: Handling Multiple Participants and Conversation History with Baseline Prototype
+  participantID: { type: String, default: "anonymous", index: true },
   filename: { type: String, required: true },
   text: { type: String, default: "" },
   chunks: { type: [chunkSchema], default: [] },

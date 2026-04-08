@@ -22,6 +22,7 @@ const uploadDir = path.join(__dirname, "uploads");
 const upload = multer({ dest: uploadDir });
 const PORT = process.env.PORT || 3000;
 const RETRIEVAL_TOP_K = 3;
+const HISTORY_LIMIT = 5;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -33,6 +34,93 @@ function normalizeRetrievalMethod(method) {
   return String(method || "semantic").toLowerCase() === "tfidf"
     ? "tfidf"
     : "semantic";
+}
+
+// In-Class Assignment: Handling Multiple Participants and Conversation History with Baseline Prototype
+function normalizeParticipantID(participantID) {
+  return String(participantID || "").trim();
+}
+
+function requireParticipantID(participantID, res) {
+  const normalizedParticipantID = normalizeParticipantID(participantID);
+
+  if (!normalizedParticipantID) {
+    res.status(400).json({ error: "Participant ID is required." });
+    return null;
+  }
+
+  return normalizedParticipantID;
+}
+
+function deriveSystemID(participantID) {
+  const numericMatch = String(participantID || "").match(/\d+/);
+
+  if (!numericMatch) {
+    return 1;
+  }
+
+  return Number.parseInt(numericMatch[0], 10) % 2 === 0 ? 2 : 1;
+}
+
+function normalizeSystemID(systemID, participantID) {
+  const parsedSystemID = Number.parseInt(systemID, 10);
+
+  if (parsedSystemID === 1 || parsedSystemID === 2) {
+    return parsedSystemID;
+  }
+
+  return deriveSystemID(participantID);
+}
+
+function normalizeHistoryLimit(limit) {
+  const parsedLimit = Number.parseInt(limit, 10);
+
+  if (Number.isNaN(parsedLimit) || parsedLimit <= 0) {
+    return HISTORY_LIMIT;
+  }
+
+  return Math.min(parsedLimit, HISTORY_LIMIT);
+}
+
+function normalizeConversationHistory(history, limit = HISTORY_LIMIT) {
+  if (!Array.isArray(history)) {
+    return [];
+  }
+
+  return history
+    .slice(-limit)
+    .map((entry) => ({
+      userInput: String(entry.userInput || "").trim(),
+      botResponse: String(entry.botResponse || "").trim(),
+    }))
+    .filter((entry) => entry.userInput && entry.botResponse);
+}
+
+function buildConversationMessages(history) {
+  return history.flatMap((entry) => [
+    {
+      role: "user",
+      content: entry.userInput,
+    },
+    {
+      role: "assistant",
+      content: entry.botResponse,
+    },
+  ]);
+}
+
+function buildSystemPrompt(systemID) {
+  const basePrompt =
+    "You are a helpful research chatbot. Answer using the retrieved document evidence when it is relevant. If the evidence is weak or missing, say so clearly and answer cautiously.";
+
+  if (systemID === 2) {
+    return (
+      basePrompt +
+      " You are operating in System 2, which is currently a placeholder alternate condition that should behave consistently with the baseline system."
+    );
+  }
+
+  return basePrompt;
 }
 
 function mapRetrievedDocuments(retrievedDocs) {
@@ -62,8 +150,13 @@ app.get("/", (req, res) => {
 });
 
 app.get("/documents", async (req, res) => {
+  const participantID = requireParticipantID(req.query.participantID, res);
+  if (!participantID) {
+    return;
+  }
+
   try {
-    const documents = await Document.find({}, "_id filename processingStatus processedAt")
+    const documents = await Document.find({ participantID }, "_id filename processingStatus processedAt")
       .sort({ processedAt: -1, _id: -1 });
     res.json({ documents });
   } catch (err) {
@@ -74,6 +167,10 @@ app.get("/documents", async (req, res) => {
 
 app.post("/upload-document", upload.single("document"), async (req, res) => {
   let documentRecord = null;
+  const participantID = requireParticipantID(req.body.participantID, res);
+  if (!participantID) {
+    return;
+  }
 
   if (!req.file) {
     return res.status(400).json({ error: "No file uploaded." });
@@ -85,6 +182,7 @@ app.post("/upload-document", upload.single("document"), async (req, res) => {
 
   try {
     documentRecord = await Document.create({
+      participantID,
       filename: req.file.originalname,
       processingStatus: "processing",
     });
@@ -134,9 +232,18 @@ app.post("/upload-document", upload.single("document"), async (req, res) => {
 });
 
 app.post("/chat", async (req, res) => {
-  const participantID = String(req.body.participantID || "anonymous").trim() || "anonymous";
+  const participantID = requireParticipantID(req.body.participantID, res);
+  if (!participantID) {
+    return;
+  }
+
+  const systemID = normalizeSystemID(req.body.systemID, participantID);
   const userInput = String(req.body.input || req.body.message || "").trim();
   const retrievalMethod = normalizeRetrievalMethod(req.body.retrievalMethod);
+  const conversationHistory = normalizeConversationHistory(
+    req.body.conversationHistory,
+    normalizeHistoryLimit(req.body.limit || HISTORY_LIMIT)
+  );
 
   if (!userInput) {
     return res.status(400).json({ error: "Please enter a message." });
@@ -151,6 +258,7 @@ app.post("/chat", async (req, res) => {
       method: retrievalMethod,
       topK: RETRIEVAL_TOP_K,
       minScore: retrievalMethod === "tfidf" ? 0 : 0.3,
+      participantID,
     });
     const retrievedDocuments = mapRetrievedDocuments(retrievedDocs);
     const evidenceContext = buildEvidenceContext(retrievedDocuments);
@@ -160,12 +268,17 @@ app.post("/chat", async (req, res) => {
       messages: [
         {
           role: "system",
-          content:
-            "You are a helpful research chatbot. Answer using the retrieved document evidence when it is relevant. If the evidence is weak or missing, say so clearly and answer cautiously.",
+          content: buildSystemPrompt(systemID),
         },
+        ...buildConversationMessages(conversationHistory),
         {
           role: "user",
-          content: `Participant ID: ${participantID}\n\nUser question:\n${userInput}\n\nRetrieved evidence:\n${evidenceContext}\n\nAnswer the question using the evidence above when possible. Mention when the evidence is insufficient.`,
+          content:
+            `Participant ID: ${participantID}\n` +
+            `System ID: ${systemID}\n\n` +
+            `User question:\n${userInput}\n\n` +
+            `Retrieved evidence:\n${evidenceContext}\n\n` +
+            "Answer the question using the evidence above when possible. Use the prior conversation when it is relevant and mention when the evidence is insufficient.",
         },
       ],
     });
@@ -178,6 +291,7 @@ app.post("/chat", async (req, res) => {
 
     await Interaction.create({
       participantID,
+      systemID,
       userInput,
       botResponse,
       retrievalMethod,
@@ -188,6 +302,7 @@ app.post("/chat", async (req, res) => {
     res.json({
       userMessage: userInput,
       botResponse,
+      systemID,
       retrievalMethod,
       retrievedDocuments,
       confidenceMetrics,
@@ -199,10 +314,16 @@ app.post("/chat", async (req, res) => {
 });
 
 app.post("/log-event", async (req, res) => {
-  const { participantID, eventType, elementName } = req.body;
+  const participantID = requireParticipantID(req.body.participantID, res);
+  if (!participantID) {
+    return;
+  }
+
+  const systemID = normalizeSystemID(req.body.systemID, participantID);
+  const { eventType, elementName } = req.body;
 
   try {
-    await EventLog.create({ participantID, eventType, elementName });
+    await EventLog.create({ participantID, systemID, eventType, elementName });
     res.json({ success: true });
   } catch (err) {
     console.error("Event log error:", err.message);
@@ -211,11 +332,20 @@ app.post("/log-event", async (req, res) => {
 });
 
 app.post("/history", async (req, res) => {
-  const { participantID } = req.body;
+  const participantID = requireParticipantID(req.body.participantID, res);
+  if (!participantID) {
+    return;
+  }
+
+  const limit = normalizeHistoryLimit(req.body.limit);
 
   try {
-    const interactions = await Interaction.find({ participantID }).sort({ timestamp: 1 });
-    res.json({ history: interactions });
+    const interactions = await Interaction.find({ participantID })
+      .sort({ timestamp: -1, _id: -1 })
+      .limit(limit)
+      .lean();
+
+    res.json({ history: interactions.reverse() });
   } catch (err) {
     console.error("History error:", err.message);
     res.status(500).json({ error: "Failed to retrieve history." });

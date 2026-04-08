@@ -22,7 +22,9 @@ const confidenceMetricsSchema = new mongoose.Schema(
 );
 
 const interactionSchema = new mongoose.Schema({
+  // In-Class Assignment: Handling Multiple Participants and Conversation History with Baseline Prototype
   participantID: { type: String, required: true },
+  systemID: { type: Number, enum: [1, 2], default: 1 },
   userInput:     { type: String, required: true },
   botResponse:   { type: String, required: true },
   retrievalMethod: { type: String, default: "semantic" },

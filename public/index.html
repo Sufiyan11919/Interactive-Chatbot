@@ -29,16 +29,19 @@
             </p>
         </div>
 
-        <div class="card participant-card">
-            <label for="participant-id" class="section-title">Enter Your Participant ID</label>
+        <!-- In-Class Assignment: Handling Multiple Participants and Conversation History with Baseline Prototype -->
+        <form id="participant-form" class="card participant-card">
+            <label for="participantID" class="section-title">Enter Your Participant ID</label>
             <input
                 type="text"
-                id="participant-id"
+                id="participantID"
+                name="participantID"
                 placeholder="e.g. participant_001"
                 autocomplete="off"
+                required
             />
-            <button id="start-btn" class="btn btn-primary">Start Chat</button>
-        </div>
+            <button type="submit" class="btn btn-primary">Start Chat</button>
+        </form>
     </div>
 
     <script src="home.js"></script>

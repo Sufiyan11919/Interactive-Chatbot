@@ -52,7 +52,16 @@
 
         <!-- Assignment 1 - HTML Structure: Right Panel (IDs: chat-container, messages, user-input, send-btn) -->
         <main id="chat-container">
-            <h2 class="panel-title">AI Chat</h2>
+            <!-- In-Class Assignment: Handling Multiple Participants and Conversation History with Baseline Prototype -->
+            <div class="chat-header">
+                <div class="chat-title-group">
+                    <h2 class="panel-title">AI Chat</h2>
+                    <p id="chat-session-meta" class="chat-session-meta"></p>
+                </div>
+                <span id="system-badge" class="system-badge"></span>
+            </div>
+
+            <p id="system-notice" class="system-notice" hidden></p>
 
             <div id="messages"></div>
 
