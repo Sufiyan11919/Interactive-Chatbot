@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Workflow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+    <!-- Assignment: Add a Study Workflow Page & Qualtrics Demographics Survey Link -->
+    <div class="home-container">
+        <h1>Study Workflow</h1>
+
+        <div class="home-description">
+            <p>Please complete the following steps in order.</p>
+            <p id="workflow-session-meta" class="chat-session-meta"></p>
+        </div>
+
+        <ol id="workflow-list" class="workflow-list">
+            <li>
+                <button id="survey-btn" class="workflow-btn" type="button">
+                    1. Complete the demographics questionnaire.
+                </button>
+            </li>
+            <li>
+                <button id="task-btn" class="workflow-btn" type="button">
+                    2. Read the task.
+                </button>
+            </li>
+            <li>
+                <button id="prototype-btn" class="workflow-btn" type="button">
+                    3. Use the AI system to complete the task.
+                </button>
+            </li>
+        </ol>
+    </div>
+
+    <script src="study-workflow.js"></script>
+</body>
+
+</html>

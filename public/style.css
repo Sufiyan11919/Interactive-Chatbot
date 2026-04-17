@@ -434,6 +434,45 @@ body {
   font-size: 1rem;
 }
 
+/* ---------- Study Workflow ---------- */
+.workflow-list {
+  list-style: decimal inside;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0;
+  margin: 0;
+}
+
+.workflow-list > li {
+  list-style: none;
+}
+
+.workflow-btn {
+  width: 100%;
+  text-align: left;
+  padding: 16px 18px;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  font-family: "Roboto", sans-serif;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #111827;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
+}
+
+.workflow-btn:hover {
+  border-color: #027bff;
+  box-shadow: 0 6px 18px rgba(2, 123, 255, 0.18);
+}
+
+.workflow-btn:active {
+  transform: translateY(1px);
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 900px) {
   .app-container {

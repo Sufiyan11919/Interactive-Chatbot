@@ -33,11 +33,9 @@ participantForm.addEventListener("submit", function (event) {
 
   localStorage.setItem("participantID", participantID);
 
-  const destination = systemID === 2 ? "/enhanced.html" : "/chat.html";
-
+  // Assignment: Send participant to Study Workflow page between homepage and AI system.
   window.location.href =
-    destination +
-    "?participantID=" +
+    "/study-workflow.html?participantID=" +
     encodeURIComponent(participantID) +
     "&systemID=" +
     systemID;
