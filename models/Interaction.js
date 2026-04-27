@@ -28,6 +28,8 @@ const interactionSchema = new mongoose.Schema({
   userInput:     { type: String, required: true },
   botResponse:   { type: String, required: true },
   retrievalMethod: { type: String, default: "semantic" },
+  // Milestone 3 - Enhanced prototype: tracks which System 2 study tool shaped the response.
+  studyMode: { type: String, default: "general" },
   retrievedDocuments: { type: [retrievedDocumentSchema], default: [] },
   confidenceMetrics: { type: confidenceMetricsSchema, default: null },
   timestamp:     { type: Date,   default: Date.now }

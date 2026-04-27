@@ -22,7 +22,11 @@ const uploadDir = path.join(__dirname, "uploads");
 const upload = multer({ dest: uploadDir });
 const PORT = process.env.PORT || 3000;
 const RETRIEVAL_TOP_K = 3;
+// Milestone 3 - Enhanced prototype: System 2 uses richer retrieval for structured comparison mode.
+const ENHANCED_COMPARISON_TOP_K = 8;
 const HISTORY_LIMIT = 5;
+// Milestone 3 - Enhanced prototype: supported study modes for the System 2 interface.
+const STUDY_MODES = new Set(["general", "explain", "compare", "define", "simplify"]);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -34,6 +38,12 @@ function normalizeRetrievalMethod(method) {
   return String(method || "semantic").toLowerCase() === "tfidf"
     ? "tfidf"
     : "semantic";
+}
+
+// Milestone 3 - Enhanced prototype: normalize the study mode selected in the System 2 UI.
+function normalizeStudyMode(mode) {
+  const normalizedMode = String(mode || "general").toLowerCase();
+  return STUDY_MODES.has(normalizedMode) ? normalizedMode : "general";
 }
 
 // In-Class Assignment: Handling Multiple Participants and Conversation History with Baseline Prototype
@@ -114,13 +124,94 @@ function buildSystemPrompt(systemID) {
     "You are a helpful research chatbot. Answer using the retrieved document evidence when it is relevant. If the evidence is weak or missing, say so clearly and answer cautiously.";
 
   if (systemID === 2) {
+    // Milestone 3 - Enhanced prototype: course-aware prompt for the System 2 study assistant.
     return (
-      basePrompt +
-      " You are operating in System 2, which is currently a placeholder alternate condition that should behave consistently with the baseline system."
+      "You are an enhanced AI study assistant for master's students in a reading-heavy computer science course. " +
+      "Ground answers in the student's uploaded research papers, lecture slides, and notes whenever evidence is available. " +
+      "Prioritize conceptual understanding over generic summary: define terms, explain why ideas matter, use simple language, and give concrete examples. " +
+      "Use prior conversation context to support follow-up questions. If the student asks for clarification, change explanation strategy instead of repeating the same wording. " +
+      "When comparing sources, synthesize across retrieved documents with clear headings such as Paper says, Slides or other source says, Key differences, and Study takeaway. " +
+      "When evidence is weak, missing, or only comes from one source, state that limitation clearly."
     );
   }
 
   return basePrompt;
+}
+
+// Milestone 3 - Enhanced prototype: add mode-specific answer structure for System 2 without changing System 1 behavior.
+function buildChatUserPrompt({
+  participantID,
+  systemID,
+  studyMode,
+  userInput,
+  evidenceContext,
+}) {
+  const sharedPrompt =
+    `Participant ID: ${participantID}\n` +
+    `System ID: ${systemID}\n\n` +
+    `User question:\n${userInput}\n\n` +
+    `Retrieved evidence:\n${evidenceContext}\n\n`;
+
+  if (systemID !== 2) {
+    return (
+      sharedPrompt +
+      "Answer the question using the evidence above when possible. Use the prior conversation when it is relevant and mention when the evidence is insufficient."
+    );
+  }
+
+  const modeInstructions = {
+    general:
+      "Answer as a course-aware study assistant. Ground the response in the evidence, explain the concept clearly, and include a concise study takeaway.",
+    explain:
+      "Explain the concept for a graduate student. Use the headings: What it means, Why it matters, Simple example, Study takeaway.",
+    compare:
+      "Compare how the retrieved sources explain the same concept. Use the headings: Paper says, Slides or other source says, Key differences, Study takeaway. If fewer than two sources are retrieved, say that the comparison is limited.",
+    define:
+      "Define the term using the course materials. Use the headings: Definition, Course context, Plain-language explanation, Example.",
+    simplify:
+      "The student is asking for clarification. Do not simply restate the previous answer. Use the headings: Simpler explanation, Analogy, Step-by-step breakdown, Concrete example.",
+  };
+
+  return (
+    sharedPrompt +
+    `Study mode: ${studyMode}\n` +
+    modeInstructions[studyMode] +
+    " Use prior conversation only when it helps the student's current learning goal, and be explicit when the uploaded evidence is insufficient."
+  );
+}
+
+// Milestone 3 - Enhanced prototype: prefer multiple source documents when comparison mode has enough evidence.
+function diversifyRetrievedDocuments(retrievedDocs, topK) {
+  if (!Array.isArray(retrievedDocs) || retrievedDocs.length <= 1) {
+    return retrievedDocs || [];
+  }
+
+  const selected = [];
+  const selectedKeys = new Set();
+  const usedDocs = new Set();
+
+  retrievedDocs.forEach((doc) => {
+    const docKey = doc.documentName || doc.docName || String(doc.documentId || "");
+    const chunkKey = `${docKey}:${doc.chunkIndex}`;
+
+    if (!usedDocs.has(docKey) && !selectedKeys.has(chunkKey) && selected.length < topK) {
+      selected.push(doc);
+      selectedKeys.add(chunkKey);
+      usedDocs.add(docKey);
+    }
+  });
+
+  retrievedDocs.forEach((doc) => {
+    const docKey = doc.documentName || doc.docName || String(doc.documentId || "");
+    const chunkKey = `${docKey}:${doc.chunkIndex}`;
+
+    if (!selectedKeys.has(chunkKey) && selected.length < topK) {
+      selected.push(doc);
+      selectedKeys.add(chunkKey);
+    }
+  });
+
+  return selected;
 }
 
 function mapRetrievedDocuments(retrievedDocs) {
@@ -156,8 +247,20 @@ app.get("/documents", async (req, res) => {
   }
 
   try {
-    const documents = await Document.find({ participantID }, "_id filename processingStatus processedAt")
-      .sort({ processedAt: -1, _id: -1 });
+    // Milestone 3 - Enhanced prototype: count chunks without pulling stored embeddings into the documents list.
+    const documents = await Document.aggregate([
+      { $match: { participantID } },
+      {
+        $project: {
+          filename: 1,
+          processingStatus: 1,
+          processedAt: 1,
+          chunkCount: { $size: { $ifNull: ["$chunks", []] } },
+        },
+      },
+      { $sort: { processedAt: -1, _id: -1 } },
+    ]);
+
     res.json({ documents });
   } catch (err) {
     console.error("Documents error:", err.message);
@@ -240,6 +343,7 @@ app.post("/chat", async (req, res) => {
   const systemID = normalizeSystemID(req.body.systemID, participantID);
   const userInput = String(req.body.input || req.body.message || "").trim();
   const retrievalMethod = normalizeRetrievalMethod(req.body.retrievalMethod);
+  const studyMode = systemID === 2 ? normalizeStudyMode(req.body.studyMode) : "general";
   const conversationHistory = normalizeConversationHistory(
     req.body.conversationHistory,
     normalizeHistoryLimit(req.body.limit || HISTORY_LIMIT)
@@ -254,12 +358,18 @@ app.post("/chat", async (req, res) => {
   }
 
   try {
-    const retrievedDocs = await retrievalService.retrieve(userInput, {
+    const retrievalTopK = systemID === 2 && studyMode === "compare"
+      ? ENHANCED_COMPARISON_TOP_K
+      : RETRIEVAL_TOP_K;
+    const rawRetrievedDocs = await retrievalService.retrieve(userInput, {
       method: retrievalMethod,
-      topK: RETRIEVAL_TOP_K,
+      topK: retrievalTopK,
       minScore: retrievalMethod === "tfidf" ? 0 : 0.3,
       participantID,
     });
+    const retrievedDocs = systemID === 2 && studyMode === "compare"
+      ? diversifyRetrievedDocuments(rawRetrievedDocs, ENHANCED_COMPARISON_TOP_K)
+      : rawRetrievedDocs;
     const retrievedDocuments = mapRetrievedDocuments(retrievedDocs);
     const evidenceContext = buildEvidenceContext(retrievedDocuments);
 
@@ -273,12 +383,13 @@ app.post("/chat", async (req, res) => {
         ...buildConversationMessages(conversationHistory),
         {
           role: "user",
-          content:
-            `Participant ID: ${participantID}\n` +
-            `System ID: ${systemID}\n\n` +
-            `User question:\n${userInput}\n\n` +
-            `Retrieved evidence:\n${evidenceContext}\n\n` +
-            "Answer the question using the evidence above when possible. Use the prior conversation when it is relevant and mention when the evidence is insufficient.",
+          content: buildChatUserPrompt({
+            participantID,
+            systemID,
+            studyMode,
+            userInput,
+            evidenceContext,
+          }),
         },
       ],
     });
@@ -295,6 +406,7 @@ app.post("/chat", async (req, res) => {
       userInput,
       botResponse,
       retrievalMethod,
+      studyMode,
       retrievedDocuments,
       confidenceMetrics,
     });
@@ -304,6 +416,7 @@ app.post("/chat", async (req, res) => {
       botResponse,
       systemID,
       retrievalMethod,
+      studyMode,
       retrievedDocuments,
       confidenceMetrics,
     });
