@@ -4,20 +4,111 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced Prototype</title>
+    <title>AI Study Assistant - Enhanced System</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css" />
 </head>
 
-<body>
-    <div class="home-container">
-        <!-- In-Class Assignment: Handling Multiple Participants and Conversation History with Baseline Prototype -->
-        <div class="card participant-card">
-            <h1>Enhanced prototype Comming Soon</h1>
-        </div>
+<body class="enhanced-page">
+    <!-- Milestone 3 - Enhanced prototype: System 2 interface implementing the Milestone 2 feature/tool design. -->
+    <div class="enhanced-app">
+        <aside class="enhanced-sidebar" aria-label="Document management">
+            <div class="enhanced-sidebar-header">
+                <div>
+                    <p class="enhanced-kicker">System 2</p>
+                    <h1>AI Study Assistant</h1>
+                </div>
+                <span id="enhanced-system-badge" class="enhanced-badge">Enhanced</span>
+            </div>
+
+            <p id="enhanced-session-meta" class="enhanced-session-meta"></p>
+
+            <section class="enhanced-panel">
+                <div class="enhanced-section-header">
+                    <h2>Upload Course Materials</h2>
+                    <span class="enhanced-mini-badge">TXT/PDF</span>
+                </div>
+
+                <form id="enhanced-upload-form" class="enhanced-upload-form">
+                    <input type="file" id="enhanced-file-input" accept=".txt,.pdf,text/plain,application/pdf" />
+                    <label for="enhanced-file-input" class="enhanced-file-label">Choose file</label>
+                    <span id="enhanced-file-name" class="enhanced-file-name">No file chosen</span>
+                    <button type="button" id="enhanced-upload-btn" class="btn btn-success">Upload</button>
+                </form>
+            </section>
+
+            <section class="enhanced-panel enhanced-documents-panel">
+                <div class="enhanced-section-header">
+                    <h2>Uploaded Documents</h2>
+                    <span id="enhanced-doc-count" class="enhanced-mini-badge">0 active</span>
+                </div>
+                <p id="enhanced-empty-docs" class="enhanced-empty-state">No documents uploaded yet.</p>
+                <ul id="enhanced-docs-list" class="enhanced-docs-list"></ul>
+            </section>
+
+            <section class="enhanced-panel">
+                <label for="enhanced-retrieval-method" class="enhanced-label">Retrieval Method</label>
+                <select id="enhanced-retrieval-method" class="enhanced-select">
+                    <option value="semantic">Semantic retrieval</option>
+                    <option value="tfidf">TF-IDF keyword retrieval</option>
+                </select>
+            </section>
+        </aside>
+
+        <main class="enhanced-main" aria-label="Enhanced chat">
+            <header class="enhanced-topbar">
+                <div class="enhanced-title-group">
+                    <p class="enhanced-kicker">Course-aware academic reading support</p>
+                    <h2>Conceptual Understanding Workspace</h2>
+                    <div class="enhanced-status-row" aria-label="Session status">
+                        <span id="enhanced-context-chip" class="enhanced-status-chip active">Session context active</span>
+                        <span id="enhanced-source-chip" class="enhanced-status-chip">Grounded in uploaded files</span>
+                        <span id="enhanced-mode-chip" class="enhanced-status-chip">General study mode</span>
+                    </div>
+                </div>
+            </header>
+
+            <section class="enhanced-prompts" aria-label="Suggested prompts">
+                <button type="button" class="enhanced-prompt-btn" data-mode="explain" data-prompt="Explain [concept] from my uploaded course materials in simple language. Include why it matters and one concrete example.">Explain a concept</button>
+                <button type="button" class="enhanced-prompt-btn" data-mode="compare" data-prompt="Compare how my uploaded documents explain [concept]. Use sections for each source, key differences, and a short study takeaway.">Compare across documents</button>
+                <button type="button" class="enhanced-prompt-btn" data-mode="define" data-prompt="Define [term] in the context of my course materials, then restate it in simpler language with an example.">Define a term</button>
+                <button type="button" class="enhanced-prompt-btn" data-mode="simplify" data-prompt="I am still confused. Re-explain the previous concept with a simpler explanation, an analogy, and a step-by-step breakdown.">Give a simpler example</button>
+            </section>
+
+            <div class="enhanced-workspace">
+                <section id="enhanced-messages" class="enhanced-messages" aria-live="polite"></section>
+
+                <aside class="enhanced-rail" aria-label="Study tools">
+                    <section class="enhanced-rail-panel">
+                        <h3>Study Tools</h3>
+                        <button type="button" class="enhanced-tool-btn" data-mode="compare">Structured comparison</button>
+                        <button type="button" class="enhanced-tool-btn" data-mode="explain">Concept explanation</button>
+                        <button type="button" class="enhanced-tool-btn" data-mode="define">Term definition</button>
+                        <button type="button" class="enhanced-tool-btn" data-mode="simplify">Follow-up clarification</button>
+                    </section>
+
+                    <section class="enhanced-rail-panel">
+                        <h3>Context</h3>
+                        <p id="enhanced-history-summary">Loading participant history...</p>
+                    </section>
+
+                    <section class="enhanced-rail-panel">
+                        <h3>Retrieved Evidence</h3>
+                        <p id="enhanced-evidence-summary">Evidence will appear after a response.</p>
+                    </section>
+                </aside>
+            </div>
+
+            <form id="enhanced-chat-form" class="enhanced-input-area">
+                <textarea id="enhanced-user-input" rows="2" placeholder="Ask about a concept, compare sources, define a term, or request a simpler explanation..."></textarea>
+                <button type="submit" id="enhanced-send-btn" class="btn btn-primary">Send</button>
+            </form>
+        </main>
     </div>
+
+    <script src="enhanced.js"></script>
 </body>
 
 </html>
