@@ -1,6 +1,7 @@
 (function () {
   // Milestone 3 - Enhanced prototype: client behavior for the System 2 study assistant.
   const HISTORY_LIMIT = 5;
+  const TOUR_STORAGE_KEY = "enhancedTourSeen:v1";
   const params = new URLSearchParams(window.location.search);
   const modeLabels = {
     general: "General study mode",
@@ -84,9 +85,55 @@
   const modeChip = document.getElementById("enhanced-mode-chip");
   const historySummary = document.getElementById("enhanced-history-summary");
   const evidenceSummary = document.getElementById("enhanced-evidence-summary");
+  const tourBtn = document.getElementById("enhanced-tour-btn");
 
   let conversationHistory = [];
   let activeMode = "general";
+  let lastSubmitMethod = "button";
+  let tourOverlay = null;
+  let tourHighlight = null;
+  let tourCard = null;
+  let tourStepCount = null;
+  let tourTitle = null;
+  let tourBody = null;
+  let tourBackBtn = null;
+  let tourNextBtn = null;
+  let tourSkipBtn = null;
+  let activeTourStep = 0;
+  let previousTourFocus = null;
+  let tourIsActive = false;
+  const tourSteps = [
+    {
+      selector: ".enhanced-sidebar",
+      title: "Start with your course materials",
+      body: "Upload TXT or PDF readings here. The assistant uses your files as the evidence base, so responses can stay grounded in course content.",
+    },
+    {
+      selector: "#enhanced-retrieval-method",
+      title: "Choose how evidence is retrieved",
+      body: "Semantic retrieval is best for meaning and concepts. TF-IDF is useful when you want keyword-style matching for exact terms.",
+    },
+    {
+      selector: ".enhanced-prompts",
+      title: "Use prompt starters",
+      body: "These buttons help new users ask strong study questions quickly. They fill the input with a template you can edit before sending.",
+    },
+    {
+      selector: ".enhanced-rail",
+      title: "Switch study modes",
+      body: "Study tools change the response structure for common learning tasks such as comparing sources, defining terms, and simplifying explanations.",
+    },
+    {
+      selector: "#enhanced-messages",
+      title: "Read answers with evidence",
+      body: "Responses appear here with confidence information and retrieved evidence so you can inspect what the AI used to answer.",
+    },
+    {
+      selector: "#enhanced-user-input",
+      title: "Ask, refine, and follow up",
+      body: "Type your own question here. Follow-up questions use recent context, so you can ask for clarification without starting over.",
+    },
+  ];
 
   function getRecentConversationHistory() {
     return conversationHistory.slice(-HISTORY_LIMIT);
@@ -133,6 +180,14 @@
     });
   }
 
+  function logCommonEvent(eventType, elementName) {
+    logEvent(eventType, "common-" + elementName);
+  }
+
+  function logStudyEvent(eventType, elementName) {
+    logEvent(eventType, "study-" + elementName);
+  }
+
   function formatDate(value) {
     if (!value) {
       return "Not processed yet";
@@ -167,8 +222,308 @@
     return element;
   }
 
+  function hasSeenTour() {
+    try {
+      return localStorage.getItem(TOUR_STORAGE_KEY) === "true";
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function markTourSeen() {
+    try {
+      localStorage.setItem(TOUR_STORAGE_KEY, "true");
+    } catch (error) {}
+  }
+
+  function createTourElements() {
+    if (tourOverlay) {
+      return;
+    }
+
+    tourOverlay = createElement("div", "enhanced-tour-overlay");
+    tourOverlay.hidden = true;
+    tourOverlay.setAttribute("aria-hidden", "true");
+
+    const scrim = createElement("div", "enhanced-tour-scrim");
+    scrim.addEventListener("click", function () {
+      closeTour("skipped");
+    });
+
+    tourHighlight = createElement("div", "enhanced-tour-highlight");
+    tourCard = createElement("section", "enhanced-tour-card");
+    tourCard.setAttribute("role", "dialog");
+    tourCard.setAttribute("aria-modal", "true");
+    tourCard.setAttribute("aria-labelledby", "enhanced-tour-title");
+    tourCard.setAttribute("aria-describedby", "enhanced-tour-body");
+    tourCard.tabIndex = -1;
+
+    tourStepCount = createElement("div", "enhanced-tour-step-count");
+    tourTitle = createElement("h3", "");
+    tourTitle.id = "enhanced-tour-title";
+    tourBody = createElement("p", "");
+    tourBody.id = "enhanced-tour-body";
+    const tourHint = createElement("p", "enhanced-tour-hint", "Keyboard: use arrow keys to move, Tab to switch buttons, and Escape to skip.");
+
+    const actions = createElement("div", "enhanced-tour-actions");
+    const secondaryActions = createElement("div", "enhanced-tour-secondary-actions");
+    const primaryActions = createElement("div", "enhanced-tour-primary-actions");
+
+    tourSkipBtn = createElement("button", "enhanced-tour-action", "Skip");
+    tourSkipBtn.type = "button";
+    tourBackBtn = createElement("button", "enhanced-tour-action", "Back");
+    tourBackBtn.type = "button";
+    tourNextBtn = createElement("button", "enhanced-tour-action primary", "Next");
+    tourNextBtn.type = "button";
+
+    tourSkipBtn.addEventListener("click", function () {
+      closeTour("skipped");
+    });
+    tourBackBtn.addEventListener("click", function () {
+      showPreviousTourStep();
+    });
+    tourNextBtn.addEventListener("click", function () {
+      showNextTourStep();
+    });
+
+    secondaryActions.appendChild(tourSkipBtn);
+    primaryActions.appendChild(tourBackBtn);
+    primaryActions.appendChild(tourNextBtn);
+    actions.appendChild(secondaryActions);
+    actions.appendChild(primaryActions);
+
+    tourCard.appendChild(tourStepCount);
+    tourCard.appendChild(tourTitle);
+    tourCard.appendChild(tourBody);
+    tourCard.appendChild(tourHint);
+    tourCard.appendChild(actions);
+    tourOverlay.appendChild(scrim);
+    tourOverlay.appendChild(tourHighlight);
+    tourOverlay.appendChild(tourCard);
+    document.body.appendChild(tourOverlay);
+  }
+
+  function getTourTarget(step) {
+    return document.querySelector(step.selector) || document.querySelector(".enhanced-app");
+  }
+
+  function setTourHighlight(rect) {
+    const margin = 8;
+    const top = Math.max(margin, rect.top - margin);
+    const left = Math.max(margin, rect.left - margin);
+    const width = Math.min(window.innerWidth - left - margin, rect.width + margin * 2);
+    const height = Math.min(window.innerHeight - top - margin, rect.height + margin * 2);
+
+    tourHighlight.style.top = top + "px";
+    tourHighlight.style.left = left + "px";
+    tourHighlight.style.width = Math.max(80, width) + "px";
+    tourHighlight.style.height = Math.max(48, height) + "px";
+  }
+
+  function positionTourCard(rect) {
+    tourCard.style.visibility = "hidden";
+    tourCard.style.left = "16px";
+    tourCard.style.top = "16px";
+
+    requestAnimationFrame(function () {
+      const gap = 16;
+      const margin = 16;
+      const cardRect = tourCard.getBoundingClientRect();
+      let left = rect.right + gap;
+      let top = rect.top;
+
+      if (window.innerWidth <= 860) {
+        left = 12;
+        top = rect.bottom + gap;
+
+        if (top + cardRect.height > window.innerHeight - 12) {
+          top = Math.max(12, rect.top - cardRect.height - gap);
+        }
+      } else if (left + cardRect.width > window.innerWidth - margin) {
+        left = rect.left - cardRect.width - gap;
+
+        if (left < margin) {
+          left = Math.min(Math.max(margin, rect.left), window.innerWidth - cardRect.width - margin);
+          top = rect.bottom + gap;
+        }
+      }
+
+      if (top + cardRect.height > window.innerHeight - margin) {
+        top = window.innerHeight - cardRect.height - margin;
+      }
+
+      tourCard.style.left = Math.max(margin, left) + "px";
+      tourCard.style.top = Math.max(margin, top) + "px";
+      tourCard.style.visibility = "visible";
+    });
+  }
+
+  function updateTourPosition() {
+    if (!tourIsActive) {
+      return;
+    }
+
+    const step = tourSteps[activeTourStep];
+    const target = getTourTarget(step);
+    if (!target) {
+      return;
+    }
+
+    target.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+
+    requestAnimationFrame(function () {
+      const rect = target.getBoundingClientRect();
+      setTourHighlight(rect);
+      positionTourCard(rect);
+    });
+  }
+
+  function renderTourStep() {
+    const step = tourSteps[activeTourStep];
+    tourStepCount.textContent = "Step " + (activeTourStep + 1) + " of " + tourSteps.length;
+    tourTitle.textContent = step.title;
+    tourBody.textContent = step.body;
+    tourBackBtn.disabled = activeTourStep === 0;
+    tourNextBtn.textContent = activeTourStep === tourSteps.length - 1 ? "Finish" : "Next";
+    updateTourPosition();
+    logStudyEvent("view", "tour-step-" + (activeTourStep + 1));
+  }
+
+  function startTour(source) {
+    createTourElements();
+
+    if (tourIsActive) {
+      return;
+    }
+
+    previousTourFocus = document.activeElement;
+    activeTourStep = 0;
+    tourIsActive = true;
+    tourOverlay.hidden = false;
+    tourOverlay.setAttribute("aria-hidden", "false");
+    document.addEventListener("keydown", handleTourKeydown);
+    window.addEventListener("resize", updateTourPosition);
+    renderTourStep();
+    tourNextBtn.focus();
+    logStudyEvent("start", source === "auto" ? "tour-auto-start" : "tour-manual-start");
+  }
+
+  function closeTour(reason) {
+    if (!tourIsActive) {
+      return;
+    }
+
+    tourIsActive = false;
+    tourOverlay.hidden = true;
+    tourOverlay.setAttribute("aria-hidden", "true");
+    document.removeEventListener("keydown", handleTourKeydown);
+    window.removeEventListener("resize", updateTourPosition);
+    markTourSeen();
+
+    if (reason === "finished") {
+      logStudyEvent("complete", "tour-finished");
+    } else {
+      logStudyEvent("skip", "tour-skipped");
+    }
+
+    if (previousTourFocus && typeof previousTourFocus.focus === "function") {
+      previousTourFocus.focus();
+    }
+  }
+
+  function showNextTourStep() {
+    if (activeTourStep >= tourSteps.length - 1) {
+      closeTour("finished");
+      return;
+    }
+
+    logStudyEvent("next", "tour-step-" + (activeTourStep + 1));
+    activeTourStep += 1;
+    renderTourStep();
+  }
+
+  function showPreviousTourStep() {
+    if (activeTourStep === 0) {
+      return;
+    }
+
+    logStudyEvent("back", "tour-step-" + (activeTourStep + 1));
+    activeTourStep -= 1;
+    renderTourStep();
+  }
+
+  function handleTourKeydown(event) {
+    if (!tourIsActive) {
+      return;
+    }
+    if (event.key === "Tab") {
+      trapTourFocus(event);
+    }
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeTour("skipped");
+    }
+
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      showNextTourStep();
+    }
+
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      showPreviousTourStep();
+    }
+  }
+
+  function trapTourFocus(event) {
+    const focusableElements = Array.from(
+      tourCard.querySelectorAll("button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex='-1'])")
+    );
+
+    if (focusableElements.length === 0) {
+      event.preventDefault();
+      tourCard.focus();
+      return;
+    }
+
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+
+    if (event.shiftKey && document.activeElement === firstElement) {
+      event.preventDefault();
+      lastElement.focus();
+    } else if (!event.shiftKey && document.activeElement === lastElement) {
+      event.preventDefault();
+      firstElement.focus();
+    }
+  }
+
+  function initializeGuidedTour() {
+    if (!tourBtn) {
+      return;
+    }
+
+    tourBtn.addEventListener("click", function () {
+      logStudyEvent("click", "tour-button");
+      startTour("manual");
+    });
+
+    if (!hasSeenTour()) {
+      window.setTimeout(function () {
+        if (!hasSeenTour()) {
+          startTour("auto");
+        }
+      }, 900);
+    }
+  }
+
   function appendNotice(text) {
     const notice = createElement("div", "enhanced-message enhanced-system-message", text);
+    notice.addEventListener("mouseenter", function () {
+      logStudyEvent("hover", "system-notice");
+      logCommonEvent("hover", "system-message");
+    });
     messages.appendChild(notice);
     scrollMessagesToBottom();
   }
@@ -196,6 +551,7 @@
     wrapper.appendChild(createElement("p", "", text));
     wrapper.addEventListener("mouseenter", function () {
       logEvent("hover", "enhanced-user-message");
+      logCommonEvent("hover", "user-message");
     });
     messages.appendChild(wrapper);
     scrollMessagesToBottom();
@@ -331,6 +687,9 @@
     })).size;
     section.open = sourceCount > 0;
     section.appendChild(createElement("summary", "", "Retrieved evidence (" + sourceCount + " source" + (sourceCount === 1 ? "" : "s") + ")"));
+    section.addEventListener("toggle", function () {
+      logStudyEvent("toggle", section.open ? "evidence-expanded" : "evidence-collapsed");
+    });
 
     if (!retrievedDocuments || retrievedDocuments.length === 0) {
       section.appendChild(createElement("p", "enhanced-empty-state", "No evidence retrieved for this response."));
@@ -397,6 +756,7 @@
 
     wrapper.addEventListener("mouseenter", function () {
       logEvent("hover", "enhanced-assistant-message");
+      logCommonEvent("hover", "assistant-message");
     });
 
     messages.appendChild(wrapper);
@@ -432,6 +792,7 @@
       item.appendChild(body);
       item.addEventListener("mouseenter", function () {
         logEvent("hover", "document-" + (documentRecord.filename || "unknown"));
+        logStudyEvent("hover", "document-item");
       });
       docsList.appendChild(item);
     });
@@ -516,6 +877,7 @@
 
       if (!response.ok || data.error) {
         appendNotice("Error: " + (data.error || "Failed to get a response."));
+        logStudyEvent("error", "chat-response-error");
         return;
       }
 
@@ -530,10 +892,12 @@
 
       appendBotMessage(interaction);
       rememberInteraction(interaction);
+      logStudyEvent("complete", "chat-response-success");
     } catch (error) {
       console.error("Error sending enhanced message:", error);
       loadingMessage.remove();
       appendNotice("Error: Failed to get a response.");
+      logStudyEvent("error", "chat-request-failed");
     } finally {
       sendBtn.disabled = false;
       input.focus();
@@ -542,6 +906,7 @@
 
   uploadBtn.addEventListener("click", async function () {
     logEvent("click", "enhanced-upload-btn");
+    logCommonEvent("click", "upload-document");
 
     if (fileInput.files.length === 0) {
       alert("Please choose a TXT or PDF document first.");
@@ -562,16 +927,19 @@
 
       if (!response.ok || data.error) {
         appendNotice("Upload error: " + (data.error || "Failed to upload document."));
+        logStudyEvent("error", "upload-error");
         return;
       }
 
       appendNotice("Uploaded " + data.document.filename + " with " + data.document.chunkCount + " processed chunks.");
+      logStudyEvent("complete", "upload-success");
       uploadForm.reset();
       fileName.textContent = "No file chosen";
       await loadDocuments();
     } catch (error) {
       console.error("Upload error:", error);
       appendNotice("Upload error: Failed to upload document.");
+      logStudyEvent("error", "upload-request-failed");
     } finally {
       uploadBtn.disabled = false;
     }
@@ -580,11 +948,15 @@
   fileInput.addEventListener("change", function () {
     fileName.textContent = fileInput.files.length > 0 ? fileInput.files[0].name : "No file chosen";
     logEvent("change", "enhanced-file-input");
+    logCommonEvent("change", "file-input");
+    logStudyEvent("change", fileInput.files.length > 0 ? "file-selected" : "file-cleared");
   });
 
   retrievalMethod.addEventListener("change", function () {
     appendNotice("Retrieval method changed to " + retrievalMethod.value + ".");
     logEvent("change", "enhanced-retrieval-method");
+    logCommonEvent("change", "retrieval-method");
+    logStudyEvent("change", "retrieval-method-" + retrievalMethod.value);
   });
 
   function selectPromptPlaceholder() {
@@ -602,11 +974,16 @@
       input.focus();
       selectPromptPlaceholder();
       logEvent("click", "prompt-" + button.dataset.mode);
+      logStudyEvent("select", "mode-" + button.dataset.mode + "-via-prompt");
     });
 
     button.addEventListener("mouseenter", function () {
       logEvent("hover", "prompt-" + button.dataset.mode);
+      logStudyEvent("hover", "prompt-button");
     });
+  });
+  sendBtn.addEventListener("click", function () {
+    lastSubmitMethod = "button";
   });
 
   document.querySelectorAll(".enhanced-tool-btn").forEach(function (button) {
@@ -614,28 +991,35 @@
       setMode(button.dataset.mode);
       input.focus();
       logEvent("click", "tool-" + button.dataset.mode);
+      logStudyEvent("select", "mode-" + button.dataset.mode + "-via-tool");
     });
   });
 
   chatForm.addEventListener("submit", function (event) {
     event.preventDefault();
     logEvent("click", "enhanced-send-btn");
+    logCommonEvent("submit", "send-message");
+    logStudyEvent("submit", "chat-submit-" + lastSubmitMethod);
     sendMessage();
+    lastSubmitMethod = "button";
   });
 
   input.addEventListener("focus", function () {
     logEvent("focus", "enhanced-user-input");
+    logCommonEvent("focus", "user-input");
   });
 
   input.addEventListener("keydown", function (event) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
+      lastSubmitMethod = "enter-key";
       chatForm.requestSubmit();
     }
   });
 
   messages.addEventListener("mouseenter", function () {
     logEvent("hover", "enhanced-messages");
+    logCommonEvent("hover", "messages-container");
   });
 
   sessionMeta.textContent = "Participant ID: " + participantID + " | System 2";
@@ -643,4 +1027,5 @@
   updateContextStatus();
   loadDocuments();
   loadConversationHistory();
+  initializeGuidedTour();
 })();
