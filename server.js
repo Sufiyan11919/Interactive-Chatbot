@@ -427,20 +427,28 @@ app.post("/chat", async (req, res) => {
 });
 
 // Assignment: Add a Study Workflow Page & Qualtrics Demographics Survey Link
-// Returns a Qualtrics URL with the participantID appended so Qualtrics can
-// capture it as Embedded Data.
+// Returns a Qualtrics URL with participantID/systemID and a returnUrl so
+// Qualtrics can send participants back to the workflow page after submission.
 app.post("/redirect-to-survey", (req, res) => {
   const participantID = requireParticipantID(req.body.participantID, res);
   if (!participantID) {
     return;
   }
+  const systemID = normalizeSystemID(req.body.systemID, participantID);
+  const returnUrl = String(req.body.returnUrl || "").trim();
 
   const qualtricsBaseUrl =
-    "https://qualtricsxmlfb8zdymw.qualtrics.com/jfe/form/SV_beCMMGDygjV0il8";
-  const surveyUrl =
-    qualtricsBaseUrl + "?participantID=" + encodeURIComponent(participantID);
+    "https://usfca.qualtrics.com/jfe/form/SV_bw8HUBhxCrsgCcS";
+  const surveyUrl = new URL(qualtricsBaseUrl);
+  surveyUrl.searchParams.set("participantID", participantID);
+  surveyUrl.searchParams.set("systemID", String(systemID));
 
-  res.send(surveyUrl);
+
+  if (returnUrl) {
+    surveyUrl.searchParams.set("returnUrl", returnUrl);
+  }
+
+  res.send(surveyUrl.toString());
 });
 
 app.post("/log-event", async (req, res) => {

@@ -448,6 +448,14 @@ body {
   list-style: none;
 }
 
+.workflow-status {
+  min-height: 22px;
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: #1d4ed8;
+  text-align: center;
+}
+
 .workflow-btn {
   width: 100%;
   text-align: left;
@@ -468,9 +476,62 @@ body {
   border-color: #027bff;
   box-shadow: 0 6px 18px rgba(2, 123, 255, 0.18);
 }
+.workflow-btn:disabled {
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.workflow-btn:disabled:hover {
+  border-color: #d1d5db;
+  box-shadow: none;
+}
+
+.workflow-btn.is-active {
+  background: #eff6ff;
+  border-color: #027bff;
+  color: #0f172a;
+  box-shadow: 0 6px 18px rgba(2, 123, 255, 0.18);
+}
+
+.workflow-btn.is-completed {
+  background: #e5e7eb;
+  border-color: #cbd5e1;
+  color: #6b7280;
+}
+
+.workflow-btn.is-locked {
+  background: #f9fafb;
+  border-color: #e5e7eb;
+  color: #9ca3af;
+}
 
 .workflow-btn:active {
   transform: translateY(1px);
+}
+
+.workflow-task-card {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 18px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+.workflow-task-card h2 {
+  margin: 0 0 10px;
+  font-size: 1.2rem;
+  color: #111827;
+}
+
+.workflow-task-card p {
+  margin: 0 0 10px;
+  color: #4b5563;
+  line-height: 1.55;
+}
+
+.workflow-task-card p:last-child {
+  margin-bottom: 0;
 }
 
 /* ---------- Milestone 3 - Enhanced System 2 Study Assistant ---------- */

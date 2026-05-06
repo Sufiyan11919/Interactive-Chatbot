@@ -19,6 +19,7 @@
         <div class="home-description">
             <p>Please complete the following steps in order.</p>
             <p id="workflow-session-meta" class="chat-session-meta"></p>
+            <p id="workflow-status" class="workflow-status"></p>
         </div>
 
         <ol id="workflow-list" class="workflow-list">
@@ -38,6 +39,18 @@
                 </button>
             </li>
         </ol>
+
+        <section id="task-details" class="workflow-task-card" hidden>
+            <h2>Study Task</h2>
+            <p>
+                Upload course materials or a research paper, then use the AI system to ask
+                concept explanation, definition, comparison, and follow-up clarification questions.
+            </p>
+            <p>
+                Your participant ID, chat interactions, retrieved evidence, and interface events
+                will be saved for the study.
+            </p>
+        </section>
     </div>
 
     <script src="study-workflow.js"></script>
