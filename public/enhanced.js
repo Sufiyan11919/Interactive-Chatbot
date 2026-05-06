@@ -1027,5 +1027,15 @@
   updateContextStatus();
   loadDocuments();
   loadConversationHistory();
+  // Milestone 4(a): Set return link href with participantID and systemID
+  const returnWorkflowLink = document.getElementById("return-workflow-link");
+  if (returnWorkflowLink) {
+    returnWorkflowLink.href =
+      "/study-workflow.html?participantID=" +
+      encodeURIComponent(participantID) +
+      "&systemID=" +
+      systemID;
+  }
+
   initializeGuidedTour();
 })();

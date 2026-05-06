@@ -24,7 +24,7 @@
 
         <ol id="workflow-list" class="workflow-list">
             <li>
-                <button id="survey-btn" class="workflow-btn" type="button">
+                <button id="demographics-btn" class="workflow-btn" type="button">
                     1. Complete the demographics questionnaire.
                 </button>
             </li>
@@ -34,8 +34,18 @@
                 </button>
             </li>
             <li>
+                <button id="pretask-btn" class="workflow-btn" type="button">
+                    3. Complete the pre-task questionnaire.
+                </button>
+            </li>
+            <li>
                 <button id="prototype-btn" class="workflow-btn" type="button">
-                    3. Use the AI system to complete the task.
+                    4. Use the assigned AI system.
+                </button>
+            </li>
+            <li>
+                <button id="posttask-btn" class="workflow-btn" type="button">
+                    5. Complete the post-task questionnaire.
                 </button>
             </li>
         </ol>
@@ -43,12 +53,17 @@
         <section id="task-details" class="workflow-task-card" hidden>
             <h2>Study Task</h2>
             <p>
-                Upload course materials or a research paper, then use the AI system to ask
-                concept explanation, definition, comparison, and follow-up clarification questions.
+                You are preparing for a class discussion in a reading-heavy computer science course.
+                Your goal is to understand a difficult concept from the provided research paper and
+                lecture slides well enough to explain it clearly to another student.
             </p>
             <p>
-                Your participant ID, chat interactions, retrieved evidence, and interface events
-                will be saved for the study.
+                By the end of the task, you should be able to explain the concept in simple language,
+                define one important technical term, and compare how the paper and slides present the concept.
+            </p>
+            <p>
+                Your participant ID, questionnaire responses, chat interactions, retrieved evidence,
+                and interface events will be saved for the study.
             </p>
         </section>
     </div>

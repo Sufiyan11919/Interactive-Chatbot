@@ -426,23 +426,35 @@ app.post("/chat", async (req, res) => {
   }
 });
 
-// Assignment: Add a Study Workflow Page & Qualtrics Demographics Survey Link
-// Returns a Qualtrics URL with participantID/systemID and a returnUrl so
+// Milestone 4(a): Questionnaires & Study Proposal
+// Centralised Qualtrics URL registry — one place to update survey links.
+const QUALTRICS_URLS = {
+  demographics: "https://usfca.qualtrics.com/jfe/form/SV_bw8HUBhxCrsgCcS",
+  pretask:      "https://usfca.qualtrics.com/jfe/form/SV_0uKrVAYyE7Ni4Zw",
+  posttask:     "https://usfca.qualtrics.com/jfe/form/SV_9pByP04yCiyiyKq",
+};
+
+// General Qualtrics redirect — supports demographics, pretask, and posttask.
+// Always appends participantID, systemID, and an optional returnUrl so
 // Qualtrics can send participants back to the workflow page after submission.
-app.post("/redirect-to-survey", (req, res) => {
+app.post("/redirect-to-qualtrics", (req, res) => {
   const participantID = requireParticipantID(req.body.participantID, res);
   if (!participantID) {
     return;
   }
-  const systemID = normalizeSystemID(req.body.systemID, participantID);
-  const returnUrl = String(req.body.returnUrl || "").trim();
 
-  const qualtricsBaseUrl =
-    "https://usfca.qualtrics.com/jfe/form/SV_bw8HUBhxCrsgCcS";
+  const systemID  = normalizeSystemID(req.body.systemID, participantID);
+  const surveyType = String(req.body.surveyType || "").trim();
+  const returnUrl  = String(req.body.returnUrl  || "").trim();
+
+  const qualtricsBaseUrl = QUALTRICS_URLS[surveyType];
+  if (!qualtricsBaseUrl) {
+    return res.status(400).json({ error: "Invalid survey type." });
+  }
+
   const surveyUrl = new URL(qualtricsBaseUrl);
   surveyUrl.searchParams.set("participantID", participantID);
   surveyUrl.searchParams.set("systemID", String(systemID));
-
 
   if (returnUrl) {
     surveyUrl.searchParams.set("returnUrl", returnUrl);
@@ -451,6 +463,13 @@ app.post("/redirect-to-survey", (req, res) => {
   res.send(surveyUrl.toString());
 });
 
+// Backward-compatible wrapper kept so any existing bookmarks or tests
+// that call /redirect-to-survey still work.
+app.post("/redirect-to-survey", (req, res, next) => {
+  req.body.surveyType = req.body.surveyType || "demographics";
+  req.url = "/redirect-to-qualtrics";
+  app.handle(req, res, next);
+});
 app.post("/log-event", async (req, res) => {
   const participantID = requireParticipantID(req.body.participantID, res);
   if (!participantID) {

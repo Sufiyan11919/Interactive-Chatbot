@@ -1,9 +1,14 @@
-// Assignment: Add a Study Workflow Page & Qualtrics Demographics Survey Link
+// Milestone 4(a): Questionnaires & Study Proposal
+// 5-step study workflow: demographics → task → pre-task → AI system → post-task
 (function () {
   const params = new URLSearchParams(window.location.search);
   const participantID = params.get("participantID") || localStorage.getItem("participantID");
   const systemIDParam = Number.parseInt(params.get("systemID"), 10);
-  const surveyCompleteFromUrl = params.get("surveyComplete") === "true";
+
+  // Read return flags sent back from Qualtrics
+  const demographicsCompleteFromUrl = params.get("demographicsComplete") === "true";
+  const pretaskCompleteFromUrl      = params.get("pretaskComplete")      === "true";
+  const posttaskCompleteFromUrl     = params.get("posttaskComplete")     === "true";
 
   // ── Guard: require participantID ────────────────────────────────────────────
   if (!participantID) {
@@ -29,12 +34,24 @@
     : deriveSystemID(participantID);
 
   const workflowStorageKey = "studyWorkflow:" + participantID + ":system-" + systemID;
-  const surveyBtn = document.getElementById("survey-btn");
-  const taskBtn = document.getElementById("task-btn");
-  const prototypeBtn = document.getElementById("prototype-btn");
-  const workflowStatus = document.getElementById("workflow-status");
-  const taskDetails = document.getElementById("task-details");
 
+  // DOM references
+  const demographicsBtn = document.getElementById("demographics-btn");
+  const taskBtn         = document.getElementById("task-btn");
+  const pretaskBtn      = document.getElementById("pretask-btn");
+  const prototypeBtn    = document.getElementById("prototype-btn");
+  const posttaskBtn     = document.getElementById("posttask-btn");
+  const workflowStatus  = document.getElementById("workflow-status");
+  const taskDetails     = document.getElementById("task-details");
+
+  // Show participant + system info
+  const sessionMeta = document.getElementById("workflow-session-meta");
+  if (sessionMeta) {
+    sessionMeta.textContent =
+      "Participant ID: " + participantID + " | System " + systemID;
+  }
+
+  // ── Workflow state persistence ───────────────────────────────────────────────
   function loadWorkflowState() {
     try {
       return JSON.parse(localStorage.getItem(workflowStorageKey)) || {};
@@ -49,21 +66,16 @@
 
   let workflowState = Object.assign(
     {
-      surveyComplete: false,
-      taskRead: false,
-      prototypeStarted: false,
+      demographicsComplete: false,
+      taskRead:             false,
+      pretaskComplete:      false,
+      prototypeStarted:     false,
+      posttaskComplete:     false,
     },
     loadWorkflowState()
   );
 
-  // Show which participant is logged in
-  const sessionMeta = document.getElementById("workflow-session-meta");
-  if (sessionMeta) {
-    sessionMeta.textContent =
-      "Participant ID: " + participantID + " | System " + systemID;
-  }
-
-  // ── Lightweight event logger (best-effort; tolerates failure) ───────────────
+  // ── Event logger ─────────────────────────────────────────────────────────────
   function logEvent(eventType, elementName) {
     fetch("/log-event", {
       method: "POST",
@@ -74,6 +86,43 @@
     });
   }
 
+  // ── Handle flags returned from Qualtrics via URL ─────────────────────────────
+  function applyUrlFlags() {
+    let changed = false;
+
+    if (demographicsCompleteFromUrl && !workflowState.demographicsComplete) {
+      workflowState.demographicsComplete = true;
+      logEvent("return", "Demographics Questionnaire Complete");
+      changed = true;
+    }
+
+    if (pretaskCompleteFromUrl && !workflowState.pretaskComplete) {
+      workflowState.pretaskComplete = true;
+      logEvent("return", "Pre-Task Questionnaire Complete");
+      changed = true;
+    }
+
+    if (posttaskCompleteFromUrl && !workflowState.posttaskComplete) {
+      workflowState.posttaskComplete = true;
+      logEvent("return", "Post-Task Questionnaire Complete");
+      changed = true;
+    }
+
+    if (changed) {
+      saveWorkflowState(workflowState);
+    }
+
+    // Clean flags from URL so they don't linger on refresh
+    if (demographicsCompleteFromUrl || pretaskCompleteFromUrl || posttaskCompleteFromUrl) {
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete("demographicsComplete");
+      cleanUrl.searchParams.delete("pretaskComplete");
+      cleanUrl.searchParams.delete("posttaskComplete");
+      window.history.replaceState({}, "", cleanUrl.pathname + cleanUrl.search);
+    }
+  }
+
+  // ── Step state helpers ───────────────────────────────────────────────────────
   function markStepComplete(stepName) {
     workflowState = Object.assign({}, workflowState, { [stepName]: true });
     saveWorkflowState(workflowState);
@@ -99,92 +148,130 @@
       return;
     }
 
+    // locked
     button.disabled = true;
     button.classList.add("is-locked");
     button.textContent = label;
   }
 
+  // ── UI update ────────────────────────────────────────────────────────────────
   function updateWorkflowUI() {
-    if (!workflowState.surveyComplete) {
-      setButtonState(surveyBtn, "active", "1. Complete the demographics questionnaire.");
-      setButtonState(taskBtn, "locked", "2. Read the task.");
-      setButtonState(prototypeBtn, "locked", "3. Use the AI system to complete the task.");
-      workflowStatus.textContent = "Step 1 is required before the task and AI system are unlocked.";
+    // Step 1: Demographics
+    if (!workflowState.demographicsComplete) {
+      setButtonState(demographicsBtn, "active",  "1. Complete the demographics questionnaire.");
+      setButtonState(taskBtn,         "locked",  "2. Read the task.");
+      setButtonState(pretaskBtn,      "locked",  "3. Complete the pre-task questionnaire.");
+      setButtonState(prototypeBtn,    "locked",  "4. Use the assigned AI system.");
+      setButtonState(posttaskBtn,     "locked",  "5. Complete the post-task questionnaire.");
+      workflowStatus.textContent = "Step 1 is required before the task is unlocked.";
       return;
     }
 
-    setButtonState(surveyBtn, "completed", "Questionnaire completed.");
+    setButtonState(demographicsBtn, "completed", "Demographics questionnaire completed.");
 
+    // Step 2: Task
     if (!workflowState.taskRead) {
-      setButtonState(taskBtn, "active", "2. Read the task.");
-      setButtonState(prototypeBtn, "locked", "3. Use the AI system to complete the task.");
-      workflowStatus.textContent = "Questionnaire complete. Read the task next.";
+      setButtonState(taskBtn,      "active", "2. Read the task.");
+      setButtonState(pretaskBtn,   "locked", "3. Complete the pre-task questionnaire.");
+      setButtonState(prototypeBtn, "locked", "4. Use the assigned AI system.");
+      setButtonState(posttaskBtn,  "locked", "5. Complete the post-task questionnaire.");
+      workflowStatus.textContent = "Demographics complete. Read the task next.";
       return;
     }
 
     setButtonState(taskBtn, "completed", "Task read.");
     taskDetails.hidden = false;
 
+    // Step 3: Pre-task
+    if (!workflowState.pretaskComplete) {
+      setButtonState(pretaskBtn,   "active", "3. Complete the pre-task questionnaire.");
+      setButtonState(prototypeBtn, "locked", "4. Use the assigned AI system.");
+      setButtonState(posttaskBtn,  "locked", "5. Complete the post-task questionnaire.");
+      workflowStatus.textContent = "Task read. Complete the pre-task questionnaire before using the AI system.";
+      return;
+    }
+
+    setButtonState(pretaskBtn, "completed", "Pre-task questionnaire completed.");
+
+    // Step 4: AI prototype
     if (!workflowState.prototypeStarted) {
-      setButtonState(prototypeBtn, "active", "3. Use the AI system to complete the task.");
-      workflowStatus.textContent = "Task read. You can now launch the AI system.";
+      setButtonState(prototypeBtn, "active", "4. Use the assigned AI system.");
+      setButtonState(posttaskBtn,  "locked", "5. Complete the post-task questionnaire.");
+      workflowStatus.textContent = "Pre-task questionnaire complete. You can now launch the assigned AI system.";
       return;
     }
 
     setButtonState(prototypeBtn, "completed", "AI system launched.");
-    workflowStatus.textContent = "Workflow steps completed for this participant.";
+
+    // Step 5: Post-task
+    if (!workflowState.posttaskComplete) {
+      setButtonState(posttaskBtn, "active", "5. Complete the post-task questionnaire.");
+      workflowStatus.textContent = "AI system launched. After completing the task, return here and complete the post-task questionnaire.";
+      return;
+    }
+
+    setButtonState(posttaskBtn, "completed", "Post-task questionnaire completed.");
+    workflowStatus.textContent = "All study workflow steps are complete. Thank you.";
   }
 
-  function buildSurveyReturnUrl() {
+  // ── Qualtrics redirect helpers ───────────────────────────────────────────────
+  function buildWorkflowReturnUrl(flagName) {
     const returnUrl = new URL("/study-workflow.html", window.location.origin);
     returnUrl.searchParams.set("participantID", participantID);
     returnUrl.searchParams.set("systemID", String(systemID));
-    returnUrl.searchParams.set("surveyComplete", "true");
+    returnUrl.searchParams.set(flagName, "true");
     return returnUrl.toString();
   }
 
-  if (surveyCompleteFromUrl) {
-    workflowState.surveyComplete = true;
-    saveWorkflowState(workflowState);
-    logEvent("return", "Qualtrics Survey Complete");
-
-    const cleanUrl = new URL(window.location.href);
-    cleanUrl.searchParams.delete("surveyComplete");
-    window.history.replaceState({}, "", cleanUrl.pathname + cleanUrl.search);
-  }
-
-  // ── Step 1: Demographics questionnaire (Qualtrics redirect) ─────────────────
-  function redirectToQualtrics() {
-    fetch("/redirect-to-survey", {
+  function redirectToQualtrics(surveyType, flagName, eventLabel) {
+    fetch("/redirect-to-qualtrics", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         participantID,
         systemID,
-        returnUrl: buildSurveyReturnUrl(),
+        surveyType,
+        returnUrl: buildWorkflowReturnUrl(flagName),
       }),
     })
-      .then(function (response) { return response.text(); })
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error("Failed to build Qualtrics URL.");
+        }
+        return response.text();
+      })
       .then(function (url) {
-        logEvent("redirect", "Qualtrics Survey");
+        logEvent("redirect", eventLabel);
         window.location.href = url;
       })
       .catch(function (error) {
-        console.error("Error redirecting to survey:", error);
-        alert("There was an error redirecting to the survey. Please try again.");
+        console.error("Error redirecting to Qualtrics:", error);
+        alert("There was an error redirecting to the questionnaire. Please try again.");
       });
   }
 
-  surveyBtn.addEventListener("click", redirectToQualtrics);
+  // ── Button event listeners ───────────────────────────────────────────────────
 
-  // ── Step 2: Task ───────────────────────────────────────────────────────────
+  // Step 1: Demographics
+  demographicsBtn.addEventListener("click", function () {
+    logEvent("click", "demographics-btn");
+    redirectToQualtrics("demographics", "demographicsComplete", "Demographics Questionnaire");
+  });
+
+  // Step 2: Task
   taskBtn.addEventListener("click", function () {
     logEvent("click", "task-btn");
     taskDetails.hidden = false;
     markStepComplete("taskRead");
   });
 
-  // ── Step 3: Launch the AI system (preserving participantID + systemID) ─────
+  // Step 3: Pre-task
+  pretaskBtn.addEventListener("click", function () {
+    logEvent("click", "pretask-btn");
+    redirectToQualtrics("pretask", "pretaskComplete", "Pre-Task Questionnaire");
+  });
+
+  // Step 4: AI prototype
   prototypeBtn.addEventListener("click", function () {
     logEvent("click", "prototype-btn");
     markStepComplete("prototypeStarted");
@@ -195,5 +282,13 @@
       "&systemID=" + systemID;
   });
 
+  // Step 5: Post-task
+  posttaskBtn.addEventListener("click", function () {
+    logEvent("click", "posttask-btn");
+    redirectToQualtrics("posttask", "posttaskComplete", "Post-Task Questionnaire");
+  });
+
+  // ── Initialise ───────────────────────────────────────────────────────────────
+  applyUrlFlags();
   updateWorkflowUI();
 })();
