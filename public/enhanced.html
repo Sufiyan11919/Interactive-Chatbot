@@ -67,6 +67,8 @@
                         <span id="enhanced-source-chip" class="enhanced-status-chip">Grounded in uploaded files</span>
                         <span id="enhanced-mode-chip" class="enhanced-status-chip">General study mode</span>
                         <button type="button" id="enhanced-tour-btn" class="enhanced-tour-btn">How it works</button>
+                        <button type="button" id="enhanced-notes-btn" class="enhanced-notes-btn" aria-expanded="false" aria-controls="enhanced-notes-popup">Notes</button>
+                        <a id="return-workflow-link" class="enhanced-workflow-link" href="/study-workflow.html">Return to Study Workflow</a>
                     </div>
                 </div>
             </header>
@@ -109,10 +111,42 @@
         </main>
     </div>
 
-    <!-- Milestone 4(a): Return link so participants can get back to complete the post-task questionnaire -->
-    <div style="text-align:center;padding:10px 0 4px;">
-      <a id="return-workflow-link" href="/study-workflow.html" style="font-size:0.9rem;color:#555;">Return to Study Workflow</a>
-    </div>
+    <section id="enhanced-notes-popup" class="enhanced-notes-popup" role="dialog" aria-labelledby="enhanced-notes-title" hidden>
+        <header class="enhanced-notes-header">
+            <div>
+                <p class="enhanced-kicker">Study notes</p>
+                <h2 id="enhanced-notes-title">Capture notes and screenshots</h2>
+            </div>
+            <button type="button" id="enhanced-notes-close-btn" class="enhanced-notes-close-btn" aria-label="Close notes">×</button>
+        </header>
+
+        <div class="enhanced-notes-toolbar" aria-label="Notes formatting controls">
+            <button type="button" class="enhanced-notes-tool" data-notes-command="bold"><strong>B</strong></button>
+            <button type="button" class="enhanced-notes-tool" data-notes-command="italic"><em>I</em></button>
+            <button type="button" class="enhanced-notes-tool" data-notes-command="underline"><span class="enhanced-notes-underline">U</span></button>
+            <select id="enhanced-notes-format" class="enhanced-notes-select" aria-label="Text style">
+                <option value="p">Body</option>
+                <option value="h3">Heading</option>
+                <option value="blockquote">Quote</option>
+            </select>
+            <button type="button" class="enhanced-notes-tool" data-notes-command="insertUnorderedList">Bullets</button>
+            <button type="button" class="enhanced-notes-tool" data-notes-command="insertOrderedList">Numbers</button>
+            <button type="button" class="enhanced-notes-tool" data-notes-command="undo">Undo</button>
+            <input type="file" id="enhanced-notes-image-input" accept="image/*" multiple hidden />
+            <button type="button" id="enhanced-notes-image-btn" class="enhanced-notes-tool">Add image</button>
+            <button type="button" id="enhanced-notes-capture-btn" class="enhanced-notes-tool">Capture screen</button>
+        </div>
+
+        <div id="enhanced-notes-editor" class="enhanced-notes-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Type study notes here. Paste or drop screenshots/images into this area."></div>
+
+        <footer class="enhanced-notes-footer">
+            <span id="enhanced-notes-status" class="enhanced-notes-status">Notes autosave locally.</span>
+            <div class="enhanced-notes-actions">
+                <button type="button" id="enhanced-notes-clear-btn" class="enhanced-notes-action">Clear</button>
+                <button type="button" id="enhanced-notes-export-btn" class="enhanced-notes-action primary">Export PDF</button>
+            </div>
+        </footer>
+    </section>
     <script src="enhanced.js"></script>
 </body>
 

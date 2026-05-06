@@ -2,6 +2,10 @@
   // Milestone 3 - Enhanced prototype: client behavior for the System 2 study assistant.
   const HISTORY_LIMIT = 5;
   const TOUR_STORAGE_KEY = "enhancedTourSeen:v1";
+  const NOTES_AUTOSAVE_DELAY = 500;
+  const NOTES_INPUT_LOG_INTERVAL = 8000;
+  const NOTES_MAX_IMAGE_WIDTH = 1200;
+  const NOTES_MAX_IMAGE_DATA_URL_LENGTH = 2600000;
   const params = new URLSearchParams(window.location.search);
   const modeLabels = {
     general: "General study mode",
@@ -62,6 +66,7 @@
     return;
   }
 
+  const NOTES_STORAGE_KEY = "enhancedNotes:" + participantID + ":system-2";
   const normalizedUrl = new URL(window.location.href);
   normalizedUrl.searchParams.set("participantID", participantID);
   normalizedUrl.searchParams.set("systemID", "2");
@@ -86,10 +91,25 @@
   const historySummary = document.getElementById("enhanced-history-summary");
   const evidenceSummary = document.getElementById("enhanced-evidence-summary");
   const tourBtn = document.getElementById("enhanced-tour-btn");
+  const notesBtn = document.getElementById("enhanced-notes-btn");
+  const notesPopup = document.getElementById("enhanced-notes-popup");
+  const notesCloseBtn = document.getElementById("enhanced-notes-close-btn");
+  const notesEditor = document.getElementById("enhanced-notes-editor");
+  const notesFormat = document.getElementById("enhanced-notes-format");
+  const notesImageInput = document.getElementById("enhanced-notes-image-input");
+  const notesImageBtn = document.getElementById("enhanced-notes-image-btn");
+  const notesCaptureBtn = document.getElementById("enhanced-notes-capture-btn");
+  const notesClearBtn = document.getElementById("enhanced-notes-clear-btn");
+  const notesExportBtn = document.getElementById("enhanced-notes-export-btn");
+  const notesStatus = document.getElementById("enhanced-notes-status");
 
   let conversationHistory = [];
   let activeMode = "general";
   let lastSubmitMethod = "button";
+  let notesIsOpen = false;
+  let notesSaveTimer = null;
+  let notesPreviousFocus = null;
+  let lastNotesInputLogAt = 0;
   let tourOverlay = null;
   let tourHighlight = null;
   let tourCard = null;
@@ -122,6 +142,11 @@
       selector: ".enhanced-rail",
       title: "Switch study modes",
       body: "Study tools change the response structure for common learning tasks such as comparing sources, defining terms, and simplifying explanations.",
+    },
+    {
+      selector: "#enhanced-notes-btn",
+      title: "Capture your study notes",
+      body: "Open the notes popup to write rich notes, paste or capture screenshots, and export your notes as a PDF when you are done.",
     },
     {
       selector: "#enhanced-messages",
@@ -516,6 +541,476 @@
         }
       }, 900);
     }
+  }
+
+  function escapeHtml(value) {
+    return String(value || "").replace(/[&<>"']/g, function (character) {
+      return {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "\"": "&quot;",
+        "'": "&#39;",
+      }[character];
+    });
+  }
+
+  function sanitizeNotesHtml(html) {
+    const template = document.createElement("template");
+    template.innerHTML = String(html || "");
+
+    template.content.querySelectorAll("script, style, iframe, object, embed, link, meta").forEach(function (element) {
+      element.remove();
+    });
+
+    template.content.querySelectorAll("*").forEach(function (element) {
+      Array.from(element.attributes).forEach(function (attribute) {
+        const name = attribute.name.toLowerCase();
+        const value = String(attribute.value || "").trim();
+
+        if (name.startsWith("on") || name === "style") {
+          element.removeAttribute(attribute.name);
+          return;
+        }
+
+        if ((name === "href" || name === "src") && /^javascript:/i.test(value)) {
+          element.removeAttribute(attribute.name);
+        }
+      });
+
+      if (element.tagName === "IMG") {
+        const src = element.getAttribute("src") || "";
+
+        if (!/^data:image\//i.test(src)) {
+          element.remove();
+        }
+      }
+    });
+
+    return template.innerHTML;
+  }
+
+  function notesHasContent() {
+    if (!notesEditor) {
+      return false;
+    }
+
+    return Boolean(notesEditor.textContent.trim() || notesEditor.querySelector("img"));
+  }
+
+  function setNotesStatus(text) {
+    if (notesStatus) {
+      notesStatus.textContent = text;
+    }
+  }
+
+  function updateNotesExportState() {
+    if (notesExportBtn) {
+      notesExportBtn.disabled = !notesHasContent();
+    }
+  }
+
+  function saveNotesNow() {
+    if (!notesEditor) {
+      return;
+    }
+
+    const sanitizedHtml = sanitizeNotesHtml(notesEditor.innerHTML);
+
+    try {
+      if (notesHasContent()) {
+        localStorage.setItem(NOTES_STORAGE_KEY, sanitizedHtml);
+        setNotesStatus("Saved locally at " + new Date().toLocaleTimeString() + ".");
+      } else {
+        localStorage.removeItem(NOTES_STORAGE_KEY);
+        setNotesStatus("Notes autosave locally.");
+      }
+    } catch (error) {
+      console.error("Notes save error:", error);
+      setNotesStatus("Could not save notes locally. Try removing large images.");
+      logStudyEvent("error", "notes-save-failed");
+    }
+
+    updateNotesExportState();
+  }
+
+  function scheduleNotesSave() {
+    window.clearTimeout(notesSaveTimer);
+    notesSaveTimer = window.setTimeout(saveNotesNow, NOTES_AUTOSAVE_DELAY);
+
+    const now = Date.now();
+    if (now - lastNotesInputLogAt > NOTES_INPUT_LOG_INTERVAL) {
+      lastNotesInputLogAt = now;
+      logStudyEvent("input", "notes-editor");
+    }
+  }
+
+  function loadNotes() {
+    if (!notesEditor) {
+      return;
+    }
+
+    try {
+      const savedNotes = localStorage.getItem(NOTES_STORAGE_KEY);
+
+      if (savedNotes) {
+        notesEditor.innerHTML = sanitizeNotesHtml(savedNotes);
+        setNotesStatus("Loaded saved notes for this study session.");
+      }
+    } catch (error) {
+      console.error("Notes load error:", error);
+      logStudyEvent("error", "notes-load-failed");
+    }
+
+    updateNotesExportState();
+  }
+
+  function openNotesPopup(source) {
+    if (!notesPopup || !notesBtn || !notesEditor) {
+      return;
+    }
+
+    notesPreviousFocus = document.activeElement;
+    notesIsOpen = true;
+    notesPopup.hidden = false;
+    notesBtn.setAttribute("aria-expanded", "true");
+    notesEditor.focus();
+    logStudyEvent("open", source === "button" ? "notes-popup-via-button" : "notes-popup");
+  }
+
+  function closeNotesPopup() {
+    if (!notesPopup || !notesBtn || !notesIsOpen) {
+      return;
+    }
+
+    saveNotesNow();
+    notesIsOpen = false;
+    notesPopup.hidden = true;
+    notesBtn.setAttribute("aria-expanded", "false");
+    logStudyEvent("close", "notes-popup");
+
+    if (notesPreviousFocus && typeof notesPreviousFocus.focus === "function") {
+      notesPreviousFocus.focus();
+    }
+  }
+
+  function applyNotesCommand(command, value) {
+    if (!notesEditor) {
+      return;
+    }
+    const commandValue = command === "formatBlock" && value && value.charAt(0) !== "<"
+      ? "<" + value + ">"
+      : value;
+
+    notesEditor.focus();
+    document.execCommand(command, false, commandValue || null);
+    scheduleNotesSave();
+    logStudyEvent("format", "notes-" + command.toLowerCase());
+  }
+
+  function insertNotesImage(dataUrl, altText, source) {
+    if (!notesEditor) {
+      return;
+    }
+
+    const html =
+      '<p><img src="' + dataUrl + '" alt="' + escapeHtml(altText || "Study note image") + '"></p><p><br></p>';
+    notesEditor.focus();
+    document.execCommand("insertHTML", false, html);
+    saveNotesNow();
+    logStudyEvent("insert", source || "notes-image");
+  }
+
+  function readFileAsDataUrl(file) {
+    return new Promise(function (resolve, reject) {
+      const reader = new FileReader();
+      reader.onload = function () {
+        resolve(reader.result);
+      };
+      reader.onerror = function () {
+        reject(reader.error || new Error("Could not read image."));
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function resizeImageDataUrl(dataUrl) {
+    return new Promise(function (resolve, reject) {
+      const image = new Image();
+
+      image.onload = function () {
+        const maxDimension = Math.max(image.width, image.height);
+        const scale = maxDimension > NOTES_MAX_IMAGE_WIDTH
+          ? NOTES_MAX_IMAGE_WIDTH / maxDimension
+          : 1;
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+
+        const context = canvas.getContext("2d");
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.88));
+      };
+
+      image.onerror = function () {
+        reject(new Error("Could not process image."));
+      };
+
+      image.src = dataUrl;
+    });
+  }
+
+  async function processNotesImageFile(file, source) {
+    if (!file || !String(file.type || "").startsWith("image/")) {
+      alert("Please choose an image file for notes.");
+      logStudyEvent("error", "notes-invalid-image");
+      return;
+    }
+
+    try {
+      setNotesStatus("Adding image to notes...");
+      const dataUrl = await readFileAsDataUrl(file);
+      const resizedDataUrl = await resizeImageDataUrl(dataUrl);
+
+      if (resizedDataUrl.length > NOTES_MAX_IMAGE_DATA_URL_LENGTH) {
+        alert("That image is too large for local notes. Try a smaller screenshot.");
+        setNotesStatus("Image was too large to save locally.");
+        logStudyEvent("error", "notes-image-too-large");
+        return;
+      }
+
+      insertNotesImage(resizedDataUrl, file.name || "Study note screenshot", source);
+      setNotesStatus("Image added and saved locally.");
+    } catch (error) {
+      console.error("Notes image error:", error);
+      setNotesStatus("Could not add that image.");
+      logStudyEvent("error", "notes-image-failed");
+    }
+  }
+
+  function handleNotesImageFiles(files, source) {
+    Array.from(files || []).forEach(function (file) {
+      processNotesImageFile(file, source);
+    });
+  }
+
+  async function captureScreenForNotes() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+      alert("Screen capture is not supported in this browser. You can still paste or upload a screenshot image.");
+      logStudyEvent("error", "notes-screen-capture-unsupported");
+      return;
+    }
+
+    let stream = null;
+
+    try {
+      setNotesStatus("Choose a screen, window, or tab to capture.");
+      stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+
+      const video = document.createElement("video");
+      video.muted = true;
+      video.playsInline = true;
+      video.srcObject = stream;
+      await video.play();
+      await new Promise(function (resolve) {
+        if (video.readyState >= 2) {
+          resolve();
+          return;
+        }
+
+        video.onloadeddata = resolve;
+      });
+      await new Promise(function (resolve) {
+        window.setTimeout(resolve, 250);
+      });
+
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, video.videoWidth);
+      canvas.height = Math.max(1, video.videoHeight);
+      const context = canvas.getContext("2d");
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const resizedDataUrl = await resizeImageDataUrl(canvas.toDataURL("image/jpeg", 0.88));
+
+      if (resizedDataUrl.length > NOTES_MAX_IMAGE_DATA_URL_LENGTH) {
+        alert("That screenshot is too large for local notes.");
+        setNotesStatus("Screenshot was too large to save locally.");
+        logStudyEvent("error", "notes-screen-capture-too-large");
+        return;
+      }
+
+      insertNotesImage(resizedDataUrl, "Captured screen for study notes", "notes-screen-capture");
+      setNotesStatus("Screenshot captured and saved locally.");
+    } catch (error) {
+      console.error("Screen capture error:", error);
+      setNotesStatus("Screen capture was cancelled or unavailable.");
+      logStudyEvent("error", "notes-screen-capture-failed");
+    } finally {
+      if (stream) {
+        stream.getTracks().forEach(function (track) {
+          track.stop();
+        });
+      }
+    }
+  }
+
+  function exportNotesAsPdf() {
+    if (!notesEditor || !notesHasContent()) {
+      alert("Add notes before exporting.");
+      logStudyEvent("error", "notes-export-empty");
+      return;
+    }
+
+    saveNotesNow();
+
+    const notesHtml = sanitizeNotesHtml(notesEditor.innerHTML);
+    const printWindow = window.open("", "_blank", "width=900,height=700");
+
+    if (!printWindow) {
+      alert("Please allow popups to export notes as a PDF.");
+      logStudyEvent("error", "notes-export-popup-blocked");
+      return;
+    }
+
+    const title = "Study Notes - " + participantID + " - System 2";
+    printWindow.document.open();
+    printWindow.document.write(
+      "<!DOCTYPE html>" +
+      "<html><head><title>" + escapeHtml(title) + "</title>" +
+      "<style>" +
+      "body{font-family:Arial,sans-serif;margin:36px;color:#111827;line-height:1.55;}" +
+      "header{border-bottom:3px solid #2563eb;margin-bottom:24px;padding-bottom:12px;}" +
+      "h1{font-size:24px;margin:0 0 8px;} .meta{color:#475569;font-size:13px;}" +
+      "img{max-width:100%;height:auto;border:1px solid #d8dee8;border-radius:8px;margin:10px 0;}" +
+      "blockquote{border-left:4px solid #93c5fd;margin-left:0;padding-left:12px;color:#475569;}" +
+      "@media print{body{margin:24px;} button{display:none;}}" +
+      "</style></head><body>" +
+      "<header><h1>Study Notes</h1><div class=\"meta\">Participant ID: " + escapeHtml(participantID) + " | System 2 | Exported " + escapeHtml(new Date().toLocaleString()) + "</div></header>" +
+      "<main>" + notesHtml + "</main>" +
+      "<script>window.addEventListener('load',function(){setTimeout(function(){window.print();},250);});</script>" +
+      "</body></html>"
+    );
+    printWindow.document.close();
+    setNotesStatus("Print dialog opened. Choose Save as PDF to download.");
+    logStudyEvent("export", "notes-pdf-print");
+  }
+
+  function clearNotes() {
+    if (!notesEditor || !notesHasContent()) {
+      return;
+    }
+
+    if (!window.confirm("Clear all saved notes for this session?")) {
+      return;
+    }
+
+    notesEditor.innerHTML = "";
+    localStorage.removeItem(NOTES_STORAGE_KEY);
+    setNotesStatus("Notes cleared.");
+    updateNotesExportState();
+    logStudyEvent("clear", "notes");
+  }
+
+  function initializeNotesFeature() {
+    if (!notesBtn || !notesPopup || !notesEditor) {
+      return;
+    }
+
+    loadNotes();
+
+    notesBtn.addEventListener("click", function () {
+      logStudyEvent("click", "notes-button");
+
+      if (notesIsOpen) {
+        closeNotesPopup();
+      } else {
+        openNotesPopup("button");
+      }
+    });
+
+    notesCloseBtn.addEventListener("click", closeNotesPopup);
+
+    document.querySelectorAll("[data-notes-command]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        applyNotesCommand(button.dataset.notesCommand);
+      });
+    });
+
+    notesFormat.addEventListener("change", function () {
+      applyNotesCommand("formatBlock", notesFormat.value);
+      logStudyEvent("select", "notes-format-" + notesFormat.value);
+    });
+
+    notesImageBtn.addEventListener("click", function () {
+      logStudyEvent("click", "notes-add-image");
+      notesImageInput.click();
+    });
+
+    notesImageInput.addEventListener("change", function () {
+      handleNotesImageFiles(notesImageInput.files, "notes-uploaded-image");
+      notesImageInput.value = "";
+    });
+
+    notesCaptureBtn.addEventListener("click", function () {
+      logStudyEvent("click", "notes-capture-screen");
+      captureScreenForNotes();
+    });
+
+    notesEditor.addEventListener("input", scheduleNotesSave);
+
+    notesEditor.addEventListener("paste", function (event) {
+      const clipboardData = event.clipboardData;
+      const files = Array.from(clipboardData ? clipboardData.items : [])
+        .filter(function (item) {
+          return item.kind === "file" && item.type.startsWith("image/");
+        })
+        .map(function (item) {
+          return item.getAsFile();
+        })
+        .filter(Boolean);
+
+      if (files.length > 0) {
+        event.preventDefault();
+        handleNotesImageFiles(files, "notes-pasted-image");
+        return;
+      }
+
+      const html = clipboardData ? clipboardData.getData("text/html") : "";
+
+      if (html) {
+        event.preventDefault();
+        document.execCommand("insertHTML", false, sanitizeNotesHtml(html));
+        scheduleNotesSave();
+        logStudyEvent("paste", "notes-rich-html");
+      }
+    });
+
+    notesEditor.addEventListener("dragover", function (event) {
+      event.preventDefault();
+      notesEditor.classList.add("drag-over");
+    });
+
+    notesEditor.addEventListener("dragleave", function () {
+      notesEditor.classList.remove("drag-over");
+    });
+
+    notesEditor.addEventListener("drop", function (event) {
+      event.preventDefault();
+      notesEditor.classList.remove("drag-over");
+      handleNotesImageFiles(event.dataTransfer ? event.dataTransfer.files : [], "notes-dropped-image");
+    });
+
+    notesClearBtn.addEventListener("click", clearNotes);
+    notesExportBtn.addEventListener("click", exportNotesAsPdf);
+
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && notesIsOpen && !tourIsActive) {
+        event.preventDefault();
+        closeNotesPopup();
+      }
+    });
   }
 
   function appendNotice(text) {
@@ -1036,6 +1531,7 @@
       "&systemID=" +
       systemID;
   }
+  initializeNotesFeature();
 
   initializeGuidedTour();
 })();
