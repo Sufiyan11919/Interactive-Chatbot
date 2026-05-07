@@ -72,6 +72,7 @@ const emptyDocs = document.getElementById("empty-docs");
 const chatSessionMeta = document.getElementById("chat-session-meta");
 const systemBadge = document.getElementById("system-badge");
 const systemNotice = document.getElementById("system-notice");
+const baselineTopbarMeta = document.getElementById("baseline-topbar-meta");
 
 // In-Class Assignment: keep only the most recent conversation turns in memory.
 let conversationHistory = [];
@@ -96,6 +97,9 @@ function initializeSessionInfo() {
   document.title = "AI Chatbot - " + systemLabel;
   chatSessionMeta.textContent = "Participant ID: " + participantID;
   systemBadge.textContent = systemLabel;
+  if (baselineTopbarMeta) {
+    baselineTopbarMeta.textContent = "Participant ID: " + participantID + " | " + systemLabel;
+  }
 
   if (systemID === 2) {
     systemNotice.hidden = false;
@@ -246,6 +250,7 @@ function renderDocuments(documents) {
   docsList.innerHTML = "";
 
   if (!documents || documents.length === 0) {
+    emptyDocs.textContent = "No course materials added yet. Your uploaded readings will appear here.";
     emptyDocs.style.display = "block";
     return;
   }
@@ -301,6 +306,8 @@ async function loadConversationHistory() {
         renderInteraction(entry);
       });
       console.log("Chat history loaded for:", participantID);
+    } else {
+      appendMessage("system", "Start by asking about a difficult concept from your course materials.");
     }
   } catch (err) {
     console.error("Error loading history:", err);

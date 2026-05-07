@@ -67,6 +67,9 @@
   }
 
   const NOTES_STORAGE_KEY = "enhancedNotes:" + participantID + ":system-2";
+  const NOTES_POSITION_STORAGE_KEY = "enhancedNotesPosition:" + participantID + ":system-2";
+  const NOTES_SIZE_STORAGE_KEY = "enhancedNotesSize:" + participantID + ":system-2";
+  const WELCOME_STORAGE_KEY = "enhancedWelcomeSeen:" + participantID + ":system-2";
   const normalizedUrl = new URL(window.location.href);
   normalizedUrl.searchParams.set("participantID", participantID);
   normalizedUrl.searchParams.set("systemID", "2");
@@ -93,6 +96,10 @@
   const tourBtn = document.getElementById("enhanced-tour-btn");
   const notesBtn = document.getElementById("enhanced-notes-btn");
   const notesPopup = document.getElementById("enhanced-notes-popup");
+  const notesHeader = notesPopup ? notesPopup.querySelector(".enhanced-notes-header") : null;
+  const notesResizeHandles = notesPopup
+    ? Array.from(notesPopup.querySelectorAll("[data-notes-resize]"))
+    : [];
   const notesCloseBtn = document.getElementById("enhanced-notes-close-btn");
   const notesEditor = document.getElementById("enhanced-notes-editor");
   const notesFormat = document.getElementById("enhanced-notes-format");
@@ -102,13 +109,19 @@
   const notesClearBtn = document.getElementById("enhanced-notes-clear-btn");
   const notesExportBtn = document.getElementById("enhanced-notes-export-btn");
   const notesStatus = document.getElementById("enhanced-notes-status");
+  const welcomeOverlay = document.getElementById("enhanced-welcome-overlay");
+  const welcomeStartBtn = document.getElementById("enhanced-welcome-start-btn");
+  const welcomeSkipBtn = document.getElementById("enhanced-welcome-skip-btn");
 
   let conversationHistory = [];
   let activeMode = "general";
   let lastSubmitMethod = "button";
   let notesIsOpen = false;
   let notesSaveTimer = null;
+  let notesSizeSaveTimer = null;
   let notesPreviousFocus = null;
+  let notesDragState = null;
+  let notesResizeState = null;
   let lastNotesInputLogAt = 0;
   let tourOverlay = null;
   let tourHighlight = null;
@@ -534,12 +547,72 @@
       startTour("manual");
     });
 
-    if (!hasSeenTour()) {
+    if (!hasSeenTour() && hasSeenWelcome()) {
       window.setTimeout(function () {
-        if (!hasSeenTour()) {
+        if (!hasSeenTour() && hasSeenWelcome()) {
           startTour("auto");
         }
       }, 900);
+    }
+  }
+
+  function hasSeenWelcome() {
+    return localStorage.getItem(WELCOME_STORAGE_KEY) === "true";
+  }
+
+  function markWelcomeSeen() {
+    localStorage.setItem(WELCOME_STORAGE_KEY, "true");
+  }
+
+  function closeWelcomeOverlay(action) {
+    if (!welcomeOverlay || welcomeOverlay.hidden) {
+      return;
+    }
+
+    welcomeOverlay.classList.add("is-hiding");
+    markWelcomeSeen();
+    logStudyEvent(action === "skip" ? "skip" : "start", "welcome-overlay");
+
+    window.setTimeout(function () {
+      welcomeOverlay.hidden = true;
+      welcomeOverlay.classList.remove("is-visible", "is-hiding");
+      input.focus();
+
+      if (!hasSeenTour()) {
+        window.setTimeout(function () {
+          startTour("auto");
+        }, 450);
+      }
+    }, 220);
+  }
+
+  function initializeWelcomeOverlay() {
+    if (!welcomeOverlay || !welcomeStartBtn || !welcomeSkipBtn) {
+      return;
+    }
+
+    welcomeStartBtn.addEventListener("click", function () {
+      closeWelcomeOverlay("start");
+    });
+
+    welcomeSkipBtn.addEventListener("click", function () {
+      closeWelcomeOverlay("skip");
+    });
+
+    welcomeOverlay.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeWelcomeOverlay("skip");
+      }
+    });
+
+    if (!hasSeenWelcome()) {
+      welcomeOverlay.hidden = false;
+      requestAnimationFrame(function () {
+        welcomeOverlay.classList.add("is-visible");
+        welcomeStartBtn.focus();
+      });
+      logStudyEvent("view", "welcome-overlay");
     }
   }
 
@@ -665,6 +738,320 @@
     updateNotesExportState();
   }
 
+  function getBoundedNotesPosition(left, top) {
+    if (!notesPopup) {
+      return { left: left, top: top };
+    }
+
+    const viewportMargin = 12;
+    const rect = notesPopup.getBoundingClientRect();
+    const width = rect.width || 520;
+    const height = rect.height || 420;
+    const maxLeft = Math.max(viewportMargin, window.innerWidth - width - viewportMargin);
+    const maxTop = Math.max(viewportMargin, window.innerHeight - height - viewportMargin);
+
+    return {
+      left: Math.min(Math.max(viewportMargin, left), maxLeft),
+      top: Math.min(Math.max(viewportMargin, top), maxTop),
+    };
+  }
+
+  function getNotesSizeLimits(left, top) {
+    const viewportMargin = 12;
+    const availableWidth = Math.max(280, window.innerWidth - viewportMargin * 2);
+    const availableHeight = Math.max(320, window.innerHeight - viewportMargin * 2);
+    const minWidth = Math.min(340, availableWidth);
+    const minHeight = Math.min(360, availableHeight);
+    const maxWidthAtPosition = Math.max(minWidth, window.innerWidth - left - viewportMargin);
+    const maxHeightAtPosition = Math.max(minHeight, window.innerHeight - top - viewportMargin);
+
+    return {
+      minWidth: minWidth,
+      minHeight: minHeight,
+      maxWidth: Math.min(availableWidth, maxWidthAtPosition),
+      maxHeight: Math.min(availableHeight, maxHeightAtPosition),
+    };
+  }
+
+  function setNotesPopupSize(width, height) {
+    if (!notesPopup) {
+      return;
+    }
+
+    const rect = notesPopup.getBoundingClientRect();
+    const limits = getNotesSizeLimits(rect.left || 12, rect.top || 12);
+    const boundedWidth = Math.min(Math.max(limits.minWidth, width), limits.maxWidth);
+    const boundedHeight = Math.min(Math.max(limits.minHeight, height), limits.maxHeight);
+
+    notesPopup.style.width = Math.round(boundedWidth) + "px";
+    notesPopup.style.height = Math.round(boundedHeight) + "px";
+  }
+
+  function scheduleNotesPopupSizeSave() {
+    window.clearTimeout(notesSizeSaveTimer);
+    notesSizeSaveTimer = window.setTimeout(function () {
+      saveNotesPopupSize();
+      keepNotesPopupInViewport();
+    }, 250);
+  }
+
+  function saveNotesPopupSize() {
+    if (!notesPopup) {
+      return;
+    }
+
+    const rect = notesPopup.getBoundingClientRect();
+
+    try {
+      localStorage.setItem(NOTES_SIZE_STORAGE_KEY, JSON.stringify({
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      }));
+    } catch (error) {
+      console.error("Notes size save error:", error);
+    }
+  }
+
+  function restoreNotesPopupSize() {
+    if (!notesPopup) {
+      return;
+    }
+
+    try {
+      const savedSize = JSON.parse(localStorage.getItem(NOTES_SIZE_STORAGE_KEY) || "null");
+
+      if (
+        savedSize &&
+        Number.isFinite(savedSize.width) &&
+        Number.isFinite(savedSize.height)
+      ) {
+        setNotesPopupSize(savedSize.width, savedSize.height);
+      }
+    } catch (error) {
+      console.error("Notes size load error:", error);
+      localStorage.removeItem(NOTES_SIZE_STORAGE_KEY);
+    }
+  }
+
+  function setNotesPopupPosition(left, top) {
+    if (!notesPopup) {
+      return;
+    }
+
+    const boundedPosition = getBoundedNotesPosition(left, top);
+    notesPopup.style.left = boundedPosition.left + "px";
+    notesPopup.style.top = boundedPosition.top + "px";
+    notesPopup.style.right = "auto";
+    notesPopup.style.bottom = "auto";
+  }
+
+  function saveNotesPopupPosition() {
+    if (!notesPopup) {
+      return;
+    }
+
+    const rect = notesPopup.getBoundingClientRect();
+
+    try {
+      localStorage.setItem(NOTES_POSITION_STORAGE_KEY, JSON.stringify({
+        left: Math.round(rect.left),
+        top: Math.round(rect.top),
+      }));
+    } catch (error) {
+      console.error("Notes position save error:", error);
+    }
+  }
+
+  function restoreNotesPopupPosition() {
+    if (!notesPopup) {
+      return;
+    }
+
+    try {
+      const savedPosition = JSON.parse(localStorage.getItem(NOTES_POSITION_STORAGE_KEY) || "null");
+
+      if (
+        savedPosition &&
+        Number.isFinite(savedPosition.left) &&
+        Number.isFinite(savedPosition.top)
+      ) {
+        setNotesPopupPosition(savedPosition.left, savedPosition.top);
+      }
+    } catch (error) {
+      console.error("Notes position load error:", error);
+      localStorage.removeItem(NOTES_POSITION_STORAGE_KEY);
+    }
+  }
+
+  function keepNotesPopupInViewport() {
+    if (!notesPopup || notesPopup.hidden) {
+      return;
+    }
+
+    const rect = notesPopup.getBoundingClientRect();
+    setNotesPopupSize(rect.width, rect.height);
+    const updatedRect = notesPopup.getBoundingClientRect();
+    setNotesPopupPosition(updatedRect.left, updatedRect.top);
+  }
+
+  function startNotesDrag(event) {
+    if (!notesPopup || !notesHeader || event.button !== 0) {
+      return;
+    }
+
+    if (event.target.closest("button, a, input, select, textarea, [contenteditable='true']")) {
+      return;
+    }
+
+    const rect = notesPopup.getBoundingClientRect();
+    notesDragState = {
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+    };
+
+    notesPopup.classList.add("is-dragging");
+    setNotesPopupPosition(rect.left, rect.top);
+    notesHeader.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  }
+
+  function moveNotesDrag(event) {
+    if (!notesDragState) {
+      return;
+    }
+
+    setNotesPopupPosition(
+      event.clientX - notesDragState.offsetX,
+      event.clientY - notesDragState.offsetY
+    );
+    event.preventDefault();
+  }
+
+  function endNotesDrag(event) {
+    if (!notesDragState || !notesPopup || !notesHeader) {
+      return;
+    }
+
+    notesDragState = null;
+    notesPopup.classList.remove("is-dragging");
+    saveNotesPopupPosition();
+    logStudyEvent("drag", "notes-popup");
+
+    if (notesHeader.hasPointerCapture(event.pointerId)) {
+      notesHeader.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  function startNotesResize(event) {
+    if (!notesPopup || event.button !== 0) {
+      return;
+    }
+
+    const resizeHandle = event.currentTarget;
+    const resizeDirection = resizeHandle.dataset.notesResize || "se";
+    const rect = notesPopup.getBoundingClientRect();
+    notesResizeState = {
+      direction: resizeDirection,
+      startX: event.clientX,
+      startY: event.clientY,
+      startLeft: rect.left,
+      startTop: rect.top,
+      startRight: rect.right,
+      startBottom: rect.bottom,
+      startWidth: rect.width,
+      startHeight: rect.height,
+      handle: resizeHandle,
+    };
+
+    setNotesPopupPosition(rect.left, rect.top);
+    notesPopup.classList.add("is-resizing");
+    window.addEventListener("pointermove", moveNotesResize);
+    window.addEventListener("pointerup", endNotesResize);
+    window.addEventListener("pointercancel", endNotesResize);
+
+    if (resizeHandle.setPointerCapture) {
+      resizeHandle.setPointerCapture(event.pointerId);
+    }
+    event.preventDefault();
+  }
+
+  function moveNotesResize(event) {
+    if (!notesResizeState) {
+      return;
+    }
+
+    const direction = notesResizeState.direction;
+    const deltaX = event.clientX - notesResizeState.startX;
+    const deltaY = event.clientY - notesResizeState.startY;
+    const viewportMargin = 12;
+    const limits = getNotesSizeLimits(notesResizeState.startLeft, notesResizeState.startTop);
+    let nextLeft = notesResizeState.startLeft;
+    let nextRight = notesResizeState.startRight;
+    let nextTop = notesResizeState.startTop;
+    let nextBottom = notesResizeState.startBottom;
+
+    if (direction.indexOf("e") !== -1) {
+      nextRight = Math.min(
+        Math.max(notesResizeState.startRight + deltaX, nextLeft + limits.minWidth),
+        window.innerWidth - viewportMargin
+      );
+    }
+
+    if (direction.indexOf("w") !== -1) {
+      nextLeft = Math.max(
+        Math.min(notesResizeState.startLeft + deltaX, nextRight - limits.minWidth),
+        viewportMargin
+      );
+    }
+
+    if (direction.indexOf("s") !== -1) {
+      nextBottom = Math.min(
+        Math.max(notesResizeState.startBottom + deltaY, nextTop + limits.minHeight),
+        window.innerHeight - viewportMargin
+      );
+    }
+
+    if (direction.indexOf("n") !== -1) {
+      nextTop = Math.max(
+        Math.min(notesResizeState.startTop + deltaY, nextBottom - limits.minHeight),
+        viewportMargin
+      );
+    }
+
+    notesPopup.style.left = Math.round(nextLeft) + "px";
+    notesPopup.style.top = Math.round(nextTop) + "px";
+    notesPopup.style.right = "auto";
+    notesPopup.style.bottom = "auto";
+    notesPopup.style.width = Math.round(nextRight - nextLeft) + "px";
+    notesPopup.style.height = Math.round(nextBottom - nextTop) + "px";
+    event.preventDefault();
+  }
+
+  function endNotesResize(event) {
+    if (!notesResizeState || !notesPopup) {
+      return;
+    }
+
+    const resizeHandle = notesResizeState.handle;
+    notesResizeState = null;
+    notesPopup.classList.remove("is-resizing");
+    window.removeEventListener("pointermove", moveNotesResize);
+    window.removeEventListener("pointerup", endNotesResize);
+    window.removeEventListener("pointercancel", endNotesResize);
+    keepNotesPopupInViewport();
+    saveNotesPopupSize();
+    saveNotesPopupPosition();
+    logStudyEvent("resize", "notes-popup");
+
+    if (
+      resizeHandle &&
+      resizeHandle.hasPointerCapture &&
+      resizeHandle.hasPointerCapture(event.pointerId)
+    ) {
+      resizeHandle.releasePointerCapture(event.pointerId);
+    }
+  }
+
   function openNotesPopup(source) {
     if (!notesPopup || !notesBtn || !notesEditor) {
       return;
@@ -673,6 +1060,9 @@
     notesPreviousFocus = document.activeElement;
     notesIsOpen = true;
     notesPopup.hidden = false;
+    restoreNotesPopupSize();
+    restoreNotesPopupPosition();
+    window.setTimeout(keepNotesPopupInViewport, 0);
     notesBtn.setAttribute("aria-expanded", "true");
     notesEditor.focus();
     logStudyEvent("open", source === "button" ? "notes-popup-via-button" : "notes-popup");
@@ -920,6 +1310,27 @@
 
     loadNotes();
 
+    if (notesHeader) {
+      notesHeader.addEventListener("pointerdown", startNotesDrag);
+      notesHeader.addEventListener("pointermove", moveNotesDrag);
+      notesHeader.addEventListener("pointerup", endNotesDrag);
+      notesHeader.addEventListener("pointercancel", endNotesDrag);
+      window.addEventListener("resize", keepNotesPopupInViewport);
+    }
+
+    notesResizeHandles.forEach(function (resizeHandle) {
+      resizeHandle.addEventListener("pointerdown", startNotesResize);
+    });
+
+    if (window.ResizeObserver) {
+      const notesResizeObserver = new ResizeObserver(function () {
+        if (notesIsOpen && !notesResizeState) {
+          scheduleNotesPopupSizeSave();
+        }
+      });
+      notesResizeObserver.observe(notesPopup);
+    }
+
     notesBtn.addEventListener("click", function () {
       logStudyEvent("click", "notes-button");
 
@@ -1140,8 +1551,100 @@
     return sections;
   }
 
-  function appendParagraphs(parent, text) {
+  function removeTrailingPromptBoilerplate(text) {
     const chunks = String(text || "")
+      .split(/\n{2,}/)
+      .map(function (chunk) { return chunk.trim(); })
+      .filter(Boolean);
+
+    if (chunks.length === 0) {
+      return "";
+    }
+
+    const lastChunk = chunks[chunks.length - 1];
+
+    if (
+      lastChunk.length <= 260 &&
+      /^if you\b/i.test(lastChunk) &&
+      /(question|clarification|specific|deeper|further|feel free|let me know|ask)/i.test(lastChunk)
+    ) {
+      chunks.pop();
+    }
+
+    return chunks.join("\n\n");
+  }
+
+  function appendInlineText(parent, text) {
+    String(text || "").split(/(\*\*[^*]+\*\*|`[^`]+`)/g).forEach(function (part) {
+      if (!part) {
+        return;
+      }
+
+      if (/^\*\*[^*]+\*\*$/.test(part)) {
+        parent.appendChild(createElement("strong", "", part.slice(2, -2)));
+        return;
+      }
+
+      if (/^`[^`]+`$/.test(part)) {
+        parent.appendChild(createElement("code", "enhanced-inline-code", part.slice(1, -1)));
+        return;
+      }
+
+      parent.appendChild(document.createTextNode(part));
+    });
+  }
+
+  function createFormattedTextBlock(tagName, className, text) {
+    const element = createElement(tagName, className || "");
+    appendInlineText(element, text);
+    return element;
+  }
+
+  function appendReadableList(parent, lines, ordered) {
+    const list = createElement(ordered ? "ol" : "ul", "enhanced-readable-list");
+
+    lines.forEach(function (line) {
+      const itemText = ordered
+        ? line.replace(/^\d+[\.)]\s+/, "")
+        : line.replace(/^[-*•]\s+/, "");
+      const item = createElement("li", "");
+      appendInlineText(item, itemText);
+      list.appendChild(item);
+    });
+
+    parent.appendChild(list);
+  }
+
+  function appendFormattedChunk(parent, chunk) {
+    const trimmed = String(chunk || "").trim();
+    const lines = trimmed.split(/\n/).map(function (line) {
+      return line.trim();
+    }).filter(Boolean);
+
+    if (trimmed.startsWith("```") && trimmed.endsWith("```")) {
+      const codeText = trimmed.replace(/^```[a-zA-Z0-9_-]*\n?/, "").replace(/```$/, "").trim();
+      const pre = createElement("pre", "enhanced-code-block");
+      pre.appendChild(createElement("code", "", codeText));
+      parent.appendChild(pre);
+      return;
+    }
+
+    if (lines.length > 1 && lines.every(function (line) { return /^[-*•]\s+/.test(line); })) {
+      appendReadableList(parent, lines, false);
+      return;
+    }
+
+    if (lines.length > 1 && lines.every(function (line) { return /^\d+[\.)]\s+/.test(line); })) {
+      appendReadableList(parent, lines, true);
+      return;
+    }
+
+    parent.appendChild(createFormattedTextBlock("p", "", trimmed));
+  }
+
+  function appendParagraphs(parent, text) {
+    const displayText = removeTrailingPromptBoilerplate(text);
+    const chunks = displayText
       .split(/\n{2,}/)
       .map(function (chunk) { return chunk.trim(); })
       .filter(Boolean);
@@ -1152,16 +1655,17 @@
     }
 
     chunks.forEach(function (chunk) {
-      parent.appendChild(createElement("p", "", chunk));
+      appendFormattedChunk(parent, chunk);
     });
   }
 
   function createStructuredAnswer(text, mode) {
-    const sections = parseStructuredSections(text);
-    const container = createElement("div", "enhanced-structured-answer");
+    const displayText = removeTrailingPromptBoilerplate(text);
+    const sections = parseStructuredSections(displayText);
+    const container = createElement("div", "enhanced-structured-answer mode-" + (mode || "general"));
 
-    if (sections.length <= 1 || mode === "general") {
-      appendParagraphs(container, text);
+    if (sections.length <= 1) {
+      appendParagraphs(container, displayText);
       return container;
     }
 
@@ -1175,23 +1679,67 @@
     return container;
   }
 
+  function getUniqueRetrievedDocuments(retrievedDocuments) {
+    const seen = new Set();
+
+    return (retrievedDocuments || []).filter(function (doc) {
+      const key = [
+        doc.docName || "Unknown Document",
+        doc.chunkIndex !== undefined ? doc.chunkIndex : "unknown",
+        String(doc.chunkText || "").slice(0, 160),
+      ].join("|");
+
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
+  }
+
+  function getSourceNames(retrievedDocuments) {
+    return Array.from(new Set((retrievedDocuments || []).map(function (doc) {
+      return doc.docName || "Unknown Document";
+    })));
+  }
+
+  function createSourceChips(retrievedDocuments) {
+    const sourceNames = getSourceNames(retrievedDocuments);
+
+    if (sourceNames.length === 0) {
+      return null;
+    }
+
+    const chips = createElement("div", "enhanced-source-chips");
+    const visibleSources = sourceNames.slice(0, 4);
+
+    visibleSources.forEach(function (sourceName) {
+      chips.appendChild(createElement("span", "enhanced-source-chip", sourceName));
+    });
+
+    if (sourceNames.length > visibleSources.length) {
+      chips.appendChild(createElement("span", "enhanced-source-chip muted", "+" + (sourceNames.length - visibleSources.length) + " more"));
+    }
+
+    return chips;
+  }
+
   function createEvidenceSection(retrievedDocuments) {
     const section = createElement("details", "enhanced-evidence");
-    const sourceCount = new Set((retrievedDocuments || []).map(function (doc) {
-      return doc.docName || "Unknown Document";
-    })).size;
-    section.open = sourceCount > 0;
-    section.appendChild(createElement("summary", "", "Retrieved evidence (" + sourceCount + " source" + (sourceCount === 1 ? "" : "s") + ")"));
+    const uniqueDocuments = getUniqueRetrievedDocuments(retrievedDocuments);
+    const sourceCount = getSourceNames(uniqueDocuments).length;
+    section.open = false;
+    section.appendChild(createElement("summary", "", "Show retrieved evidence (" + sourceCount + " source" + (sourceCount === 1 ? "" : "s") + ")"));
     section.addEventListener("toggle", function () {
       logStudyEvent("toggle", section.open ? "evidence-expanded" : "evidence-collapsed");
     });
 
-    if (!retrievedDocuments || retrievedDocuments.length === 0) {
+    if (!uniqueDocuments || uniqueDocuments.length === 0) {
       section.appendChild(createElement("p", "enhanced-empty-state", "No evidence retrieved for this response."));
       return section;
     }
-
-    retrievedDocuments.forEach(function (doc) {
+    uniqueDocuments.forEach(function (doc) {
       const item = createElement("div", "enhanced-evidence-item");
       const score = typeof doc.relevanceScore === "number" ? doc.relevanceScore.toFixed(4) : "0.0000";
       item.appendChild(createElement("div", "enhanced-evidence-meta", (doc.docName || "Unknown Document") + " | Chunk " + doc.chunkIndex + " | Score " + score));
@@ -1206,22 +1754,20 @@
     const row = createElement("div", "enhanced-confidence-row");
 
     if (!confidenceMetrics) {
-      row.textContent = "Confidence unavailable | Method: " + (retrievalMethodValue || "semantic");
+      row.textContent = "Confidence unavailable · Method: " + (retrievalMethodValue || "semantic");
       return row;
     }
 
     row.textContent =
-      "Overall " + formatConfidence(confidenceMetrics.overallConfidence) +
-      " | Retrieval " + formatConfidence(confidenceMetrics.retrievalConfidence) +
-      " | Method " + (confidenceMetrics.retrievalMethod || retrievalMethodValue || "semantic");
+      "Confidence: overall " + formatConfidence(confidenceMetrics.overallConfidence) +
+      " · retrieval " + formatConfidence(confidenceMetrics.retrievalConfidence) +
+      " · method " + (confidenceMetrics.retrievalMethod || retrievalMethodValue || "semantic");
     return row;
   }
 
   function updateEvidenceSummary(retrievedDocuments) {
-    const docs = retrievedDocuments || [];
-    const sourceNames = Array.from(new Set(docs.map(function (doc) {
-      return doc.docName || "Unknown Document";
-    })));
+    const docs = getUniqueRetrievedDocuments(retrievedDocuments || []);
+    const sourceNames = getSourceNames(docs);
 
     sourceChip.textContent = sourceNames.length > 0
       ? sourceNames.length + " source" + (sourceNames.length === 1 ? "" : "s") + " retrieved"
@@ -1231,22 +1777,116 @@
       : "The last response did not retrieve document evidence.";
   }
 
+  function copyTextToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "readonly");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    textarea.remove();
+    return Promise.resolve();
+  }
+
+  function saveResponseToNotes(entry) {
+    if (!notesEditor) {
+      return;
+    }
+
+    openNotesPopup("response-action");
+    const mode = entry.studyMode || activeMode;
+    const title = modeLabels[mode] || "AI Study Assistant";
+    const displayText = removeTrailingPromptBoilerplate(entry.botResponse || "");
+    const paragraphs = displayText
+      .split(/\n{2,}/)
+      .map(function (chunk) { return chunk.trim(); })
+      .filter(Boolean);
+    const html = [
+      "<h3>" + escapeHtml(title) + "</h3>",
+      paragraphs.map(function (paragraph) {
+        return "<p>" + escapeHtml(paragraph).replace(/\n/g, "<br>") + "</p>";
+      }).join(""),
+      "<p><br></p>",
+    ].join("");
+
+    notesEditor.focus();
+    document.execCommand("insertHTML", false, html);
+    saveNotesNow();
+    setNotesStatus("Saved AI response to notes.");
+    logStudyEvent("save", "response-to-notes");
+  }
+
+  function createResponseActionButton(label, actionName, onClick) {
+    const button = createElement("button", "enhanced-response-action", label);
+    button.type = "button";
+    button.addEventListener("click", function () {
+      logStudyEvent("click", "response-action-" + actionName);
+      onClick(button);
+    });
+    return button;
+  }
+
+  function createResponseActions(entry) {
+    const actions = createElement("div", "enhanced-response-actions");
+
+    actions.appendChild(createResponseActionButton("Simplify", "simplify", function () {
+      setMode("simplify");
+      sendMessage("Re-explain the previous answer in simpler language with one concrete example.");
+    }));
+
+    actions.appendChild(createResponseActionButton("Give example", "example", function () {
+      sendMessage("Give one concrete example that makes the previous answer easier to understand.");
+    }));
+
+    actions.appendChild(createResponseActionButton("Compare sources", "compare", function () {
+      setMode("compare");
+      sendMessage("Compare how my uploaded documents explain the previous topic. Use short sections and a study takeaway.");
+    }));
+
+    actions.appendChild(createResponseActionButton("Save to notes", "save-to-notes", function () {
+      saveResponseToNotes(entry);
+    }));
+
+    actions.appendChild(createResponseActionButton("Copy", "copy", function (button) {
+      copyTextToClipboard(removeTrailingPromptBoilerplate(entry.botResponse || "")).then(function () {
+        const originalText = button.textContent;
+        button.textContent = "Copied";
+        window.setTimeout(function () {
+          button.textContent = originalText;
+        }, 1400);
+      }).catch(function (error) {
+        console.error("Copy response error:", error);
+      });
+    }));
+
+    return actions;
+  }
+
   function appendBotMessage(entry) {
     const mode = entry.studyMode || activeMode;
-    const retrievedDocuments = entry.retrievedDocuments || [];
-    const wrapper = createElement("article", "enhanced-message enhanced-assistant-message");
+    const retrievedDocuments = getUniqueRetrievedDocuments(entry.retrievedDocuments || []);
+    const wrapper = createElement("article", "enhanced-message enhanced-assistant-message mode-" + mode);
     const header = createElement("div", "enhanced-message-header");
 
     header.appendChild(createElement("div", "enhanced-message-label", modeLabels[mode] || "AI Study Assistant"));
-
-    const sourceCount = new Set(retrievedDocuments.map(function (doc) {
-      return doc.docName || "Unknown Document";
-    })).size;
+    const sourceCount = getSourceNames(retrievedDocuments).length;
     header.appendChild(createElement("span", "enhanced-message-pill", sourceCount + " source" + (sourceCount === 1 ? "" : "s")));
     wrapper.appendChild(header);
 
     wrapper.appendChild(createStructuredAnswer(entry.botResponse, mode));
+    const sourceChips = createSourceChips(retrievedDocuments);
+
+    if (sourceChips) {
+      wrapper.appendChild(sourceChips);
+    }
     wrapper.appendChild(createConfidenceRow(entry.confidenceMetrics || null, entry.retrievalMethod));
+    wrapper.appendChild(createResponseActions(entry));
     wrapper.appendChild(createEvidenceSection(retrievedDocuments));
 
     wrapper.addEventListener("mouseenter", function () {
@@ -1517,7 +2157,7 @@
     logCommonEvent("hover", "messages-container");
   });
 
-  sessionMeta.textContent = "Participant ID: " + participantID + " | System 2";
+  sessionMeta.textContent = "Study session active";
   setMode("general");
   updateContextStatus();
   loadDocuments();
@@ -1532,6 +2172,7 @@
       systemID;
   }
   initializeNotesFeature();
+  initializeWelcomeOverlay();
 
   initializeGuidedTour();
 })();
