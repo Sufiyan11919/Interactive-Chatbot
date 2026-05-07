@@ -6,6 +6,9 @@
   const NOTES_INPUT_LOG_INTERVAL = 8000;
   const NOTES_MAX_IMAGE_WIDTH = 1200;
   const NOTES_MAX_IMAGE_DATA_URL_LENGTH = 2600000;
+  const EVENT_LOG_DETAIL_LIMIT = 520;
+  const EVENT_LOG_SNIPPET_LIMIT = 220;
+  const CHAT_INPUT_LOG_INTERVAL = 8000;
   const params = new URLSearchParams(window.location.search);
   const modeLabels = {
     general: "General study mode",
@@ -112,6 +115,7 @@
   const welcomeOverlay = document.getElementById("enhanced-welcome-overlay");
   const welcomeStartBtn = document.getElementById("enhanced-welcome-start-btn");
   const welcomeSkipBtn = document.getElementById("enhanced-welcome-skip-btn");
+  const taskResourceLinks = Array.from(document.querySelectorAll(".enhanced-resource-btn"));
 
   let conversationHistory = [];
   let activeMode = "general";
@@ -123,9 +127,16 @@
   let notesDragState = null;
   let notesResizeState = null;
   let lastNotesInputLogAt = 0;
+  let lastNotesSnapshotSignature = "";
+  let currentInputSource = "typed";
+  let currentInputEdited = false;
+  let lastChatInputLogAt = 0;
+  let lastChatInputSignature = "";
+  let lastRetrievalMethodValue = retrievalMethod.value;
   let tourOverlay = null;
   let tourHighlight = null;
   let tourCard = null;
+  let tourPositionFrame = null;
   let tourStepCount = null;
   let tourTitle = null;
   let tourBody = null;
@@ -142,9 +153,19 @@
       body: "Upload TXT or PDF readings here. The assistant uses your files as the evidence base, so responses can stay grounded in course content.",
     },
     {
+      selector: ".enhanced-task-resources",
+      title: "Download the task resources",
+      body: "Use these links to download the assigned Spark research paper and Spark lecture slides before or during the task.",
+    },
+    {
       selector: "#enhanced-retrieval-method",
       title: "Choose how evidence is retrieved",
       body: "Semantic retrieval is best for meaning and concepts. TF-IDF is useful when you want keyword-style matching for exact terms.",
+    },
+    {
+      selector: "#enhanced-task-goal",
+      title: "Focus on the Spark lineage task",
+      body: "The study asks you to learn RDD lineage, how it supports Spark fault recovery, and how it connects to RDDs, transformations, actions, caching, and persistence.",
     },
     {
       selector: ".enhanced-prompts",
@@ -157,9 +178,9 @@
       body: "Study tools change the response structure for common learning tasks such as comparing sources, defining terms, and simplifying explanations.",
     },
     {
-      selector: "#enhanced-notes-btn",
-      title: "Capture your study notes",
-      body: "Open the notes popup to write rich notes, paste or capture screenshots, and export your notes as a PDF when you are done.",
+      selector: ".enhanced-header-tools",
+      title: "Use enhanced tools",
+      body: "Use How it works to restart this walkthrough, and open Notes to capture rich notes, screenshots, and evidence while you study.",
     },
     {
       selector: "#enhanced-messages",
@@ -224,6 +245,105 @@
 
   function logStudyEvent(eventType, elementName) {
     logEvent(eventType, "study-" + elementName);
+  }
+
+  function normalizeLogText(value) {
+    return String(value || "")
+      .replace(/\s+/g, " ")
+      .replace(/[|=]/g, " ")
+      .trim();
+  }
+
+  function truncateForLog(value, limit) {
+    const normalizedValue = normalizeLogText(value);
+
+    if (normalizedValue.length <= limit) {
+      return normalizedValue;
+    }
+
+    return normalizedValue.slice(0, limit - 1).trim() + "…";
+  }
+
+  function countWords(value) {
+    const text = normalizeLogText(value);
+    return text ? text.split(/\s+/).length : 0;
+  }
+
+  function buildLogDetails(details) {
+    const detailText = Object.keys(details || {})
+      .filter(function (key) {
+        return details[key] !== undefined && details[key] !== null && details[key] !== "";
+      })
+      .map(function (key) {
+        return key + "=" + truncateForLog(details[key], EVENT_LOG_SNIPPET_LIMIT);
+      })
+      .join("|");
+
+    if (detailText.length <= EVENT_LOG_DETAIL_LIMIT) {
+      return detailText;
+    }
+
+    return detailText.slice(0, EVENT_LOG_DETAIL_LIMIT - 1).trim() + "…";
+  }
+
+  function logStudyDetail(eventType, elementName, details) {
+    const detailText = buildLogDetails(details);
+    logStudyEvent(eventType, detailText ? elementName + "|" + detailText : elementName);
+  }
+
+  function getNotesSnapshotDetails() {
+    if (!notesEditor) {
+      return { hasContent: false };
+    }
+
+    const text = normalizeLogText(notesEditor.textContent);
+    const imageCount = notesEditor.querySelectorAll("img").length;
+
+    return {
+      hasContent: Boolean(text || imageCount),
+      chars: text.length,
+      words: countWords(text),
+      images: imageCount,
+      text: truncateForLog(text, EVENT_LOG_SNIPPET_LIMIT),
+    };
+  }
+
+  function logNotesSnapshot(action, force) {
+    const details = getNotesSnapshotDetails();
+    const signature = [details.chars, details.words, details.images, details.text].join("|");
+
+    if (!force && signature === lastNotesSnapshotSignature) {
+      return;
+    }
+
+    lastNotesSnapshotSignature = signature;
+    logStudyDetail("snapshot", "notes-content-" + action, details);
+  }
+
+  function getInputSourceLabel(source) {
+    const baseSource = source || currentInputSource || "typed";
+    return currentInputEdited && baseSource !== "typed" ? baseSource + "-edited" : baseSource;
+  }
+
+  function logChatInputSnapshot(action, force) {
+    const text = normalizeLogText(input.value);
+    const signature = [action, getInputSourceLabel(), text].join("|");
+    const now = Date.now();
+
+    if (!force && (signature === lastChatInputSignature || now - lastChatInputLogAt < CHAT_INPUT_LOG_INTERVAL)) {
+      return;
+    }
+
+    lastChatInputLogAt = now;
+    lastChatInputSignature = signature;
+    logStudyDetail("input", "chat-draft-" + action, {
+      source: getInputSourceLabel(),
+      mode: activeMode,
+      retrieval: retrievalMethod.value,
+      chars: text.length,
+      words: countWords(text),
+      text: truncateForLog(text, EVENT_LOG_SNIPPET_LIMIT),
+    });
   }
 
   function formatDate(value) {
@@ -347,15 +467,17 @@
 
   function setTourHighlight(rect) {
     const margin = 8;
-    const top = Math.max(margin, rect.top - margin);
     const left = Math.max(margin, rect.left - margin);
-    const width = Math.min(window.innerWidth - left - margin, rect.width + margin * 2);
-    const height = Math.min(window.innerHeight - top - margin, rect.height + margin * 2);
+    const top = Math.max(margin, rect.top - margin);
+    const right = Math.min(window.innerWidth - margin, rect.right + margin);
+    const bottom = Math.min(window.innerHeight - margin, rect.bottom + margin);
+    const width = Math.max(80, right - left);
+    const height = Math.max(48, bottom - top);
 
     tourHighlight.style.top = top + "px";
     tourHighlight.style.left = left + "px";
-    tourHighlight.style.width = Math.max(80, width) + "px";
-    tourHighlight.style.height = Math.max(48, height) + "px";
+    tourHighlight.style.width = width + "px";
+    tourHighlight.style.height = height + "px";
   }
 
   function positionTourCard(rect) {
@@ -407,12 +529,19 @@
       return;
     }
 
-    target.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+    target.scrollIntoView({ block: "center", inline: "nearest", behavior: "auto" });
 
-    requestAnimationFrame(function () {
-      const rect = target.getBoundingClientRect();
-      setTourHighlight(rect);
-      positionTourCard(rect);
+    if (tourPositionFrame) {
+      window.cancelAnimationFrame(tourPositionFrame);
+    }
+
+    tourPositionFrame = window.requestAnimationFrame(function () {
+      tourPositionFrame = window.requestAnimationFrame(function () {
+        const rect = target.getBoundingClientRect();
+        setTourHighlight(rect);
+        positionTourCard(rect);
+        tourPositionFrame = null;
+      });
     });
   }
 
@@ -425,6 +554,12 @@
     tourNextBtn.textContent = activeTourStep === tourSteps.length - 1 ? "Finish" : "Next";
     updateTourPosition();
     logStudyEvent("view", "tour-step-" + (activeTourStep + 1));
+    logStudyDetail("view", "tour-step-detail", {
+      step: activeTourStep + 1,
+      total: tourSteps.length,
+      title: step.title,
+      selector: step.selector,
+    });
   }
 
   function startTour(source) {
@@ -444,6 +579,12 @@
     renderTourStep();
     tourNextBtn.focus();
     logStudyEvent("start", source === "auto" ? "tour-auto-start" : "tour-manual-start");
+    logStudyDetail("start", "tour-session", {
+      source: source || "manual",
+      totalSteps: tourSteps.length,
+      welcomeSeen: hasSeenWelcome(),
+      tourSeenBeforeStart: hasSeenTour(),
+    });
   }
 
   function closeTour(reason) {
@@ -458,10 +599,23 @@
     window.removeEventListener("resize", updateTourPosition);
     markTourSeen();
 
+    const step = tourSteps[activeTourStep] || {};
+
     if (reason === "finished") {
       logStudyEvent("complete", "tour-finished");
+      logStudyDetail("complete", "tour-finished-detail", {
+        step: activeTourStep + 1,
+        total: tourSteps.length,
+        title: step.title,
+      });
     } else {
       logStudyEvent("skip", "tour-skipped");
+      logStudyDetail("skip", "tour-skipped-detail", {
+        step: activeTourStep + 1,
+        total: tourSteps.length,
+        title: step.title,
+        reason: reason || "skipped",
+      });
     }
 
     if (previousTourFocus && typeof previousTourFocus.focus === "function") {
@@ -476,6 +630,11 @@
     }
 
     logStudyEvent("next", "tour-step-" + (activeTourStep + 1));
+    logStudyDetail("next", "tour-navigation", {
+      fromStep: activeTourStep + 1,
+      toStep: activeTourStep + 2,
+      total: tourSteps.length,
+    });
     activeTourStep += 1;
     renderTourStep();
   }
@@ -486,6 +645,11 @@
     }
 
     logStudyEvent("back", "tour-step-" + (activeTourStep + 1));
+    logStudyDetail("back", "tour-navigation", {
+      fromStep: activeTourStep + 1,
+      toStep: activeTourStep,
+      total: tourSteps.length,
+    });
     activeTourStep -= 1;
     renderTourStep();
   }
@@ -544,7 +708,18 @@
 
     tourBtn.addEventListener("click", function () {
       logStudyEvent("click", "tour-button");
+      logStudyDetail("click", "tour-button-detail", {
+        active: tourIsActive,
+        currentStep: tourIsActive ? activeTourStep + 1 : "not-active",
+        tourSeen: hasSeenTour(),
+      });
       startTour("manual");
+    });
+
+    logStudyDetail("state", "tour-availability", {
+      tourSeen: hasSeenTour(),
+      welcomeSeen: hasSeenWelcome(),
+      autoStartEligible: !hasSeenTour() && hasSeenWelcome(),
     });
 
     if (!hasSeenTour() && hasSeenWelcome()) {
@@ -572,6 +747,13 @@
     welcomeOverlay.classList.add("is-hiding");
     markWelcomeSeen();
     logStudyEvent(action === "skip" ? "skip" : "start", "welcome-overlay");
+    logStudyDetail(action === "skip" ? "skip" : "start", "welcome-overlay-detail", {
+      action: action || "start",
+      tourSeen: hasSeenTour(),
+      resourceCount: taskResourceLinks.length,
+      promptCount: document.querySelectorAll(".enhanced-prompt-btn").length,
+      toolCount: document.querySelectorAll(".enhanced-tool-btn").length,
+    });
 
     window.setTimeout(function () {
       welcomeOverlay.hidden = true;
@@ -613,6 +795,12 @@
         welcomeStartBtn.focus();
       });
       logStudyEvent("view", "welcome-overlay");
+      logStudyDetail("view", "welcome-overlay-detail", {
+        tourSeen: hasSeenTour(),
+        resourceCount: taskResourceLinks.length,
+        promptCount: document.querySelectorAll(".enhanced-prompt-btn").length,
+        toolCount: document.querySelectorAll(".enhanced-tool-btn").length,
+      });
     }
   }
 
@@ -689,6 +877,7 @@
     }
 
     const sanitizedHtml = sanitizeNotesHtml(notesEditor.innerHTML);
+    let saveSucceeded = false;
 
     try {
       if (notesHasContent()) {
@@ -698,6 +887,7 @@
         localStorage.removeItem(NOTES_STORAGE_KEY);
         setNotesStatus("Notes autosave locally.");
       }
+      saveSucceeded = true;
     } catch (error) {
       console.error("Notes save error:", error);
       setNotesStatus("Could not save notes locally. Try removing large images.");
@@ -705,6 +895,9 @@
     }
 
     updateNotesExportState();
+    if (saveSucceeded) {
+      logNotesSnapshot("saved", false);
+    }
   }
 
   function scheduleNotesSave() {
@@ -715,6 +908,9 @@
     if (now - lastNotesInputLogAt > NOTES_INPUT_LOG_INTERVAL) {
       lastNotesInputLogAt = now;
       logStudyEvent("input", "notes-editor");
+      logStudyDetail("input", "notes-editor-detail", Object.assign({
+        open: notesIsOpen,
+      }, getNotesSnapshotDetails()));
     }
   }
 
@@ -729,6 +925,7 @@
       if (savedNotes) {
         notesEditor.innerHTML = sanitizeNotesHtml(savedNotes);
         setNotesStatus("Loaded saved notes for this study session.");
+        logNotesSnapshot("restored", true);
       }
     } catch (error) {
       console.error("Notes load error:", error);
@@ -936,6 +1133,13 @@
     notesPopup.classList.remove("is-dragging");
     saveNotesPopupPosition();
     logStudyEvent("drag", "notes-popup");
+    const rect = notesPopup.getBoundingClientRect();
+    logStudyDetail("drag", "notes-popup-detail", {
+      left: Math.round(rect.left),
+      top: Math.round(rect.top),
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+    });
 
     if (notesHeader.hasPointerCapture(event.pointerId)) {
       notesHeader.releasePointerCapture(event.pointerId);
@@ -1042,6 +1246,11 @@
     saveNotesPopupSize();
     saveNotesPopupPosition();
     logStudyEvent("resize", "notes-popup");
+    const rect = notesPopup.getBoundingClientRect();
+    logStudyDetail("resize", "notes-popup-detail", {
+      width: Math.round(rect.width),
+      height: Math.round(rect.height),
+    });
 
     if (
       resizeHandle &&
@@ -1066,6 +1275,10 @@
     notesBtn.setAttribute("aria-expanded", "true");
     notesEditor.focus();
     logStudyEvent("open", source === "button" ? "notes-popup-via-button" : "notes-popup");
+    logStudyDetail("open", "notes-popup-detail", Object.assign({
+      source: source || "unknown",
+    }, getNotesSnapshotDetails()));
+    logNotesSnapshot("opened", true);
   }
 
   function closeNotesPopup() {
@@ -1078,6 +1291,8 @@
     notesPopup.hidden = true;
     notesBtn.setAttribute("aria-expanded", "false");
     logStudyEvent("close", "notes-popup");
+    logStudyDetail("close", "notes-popup-detail", getNotesSnapshotDetails());
+    logNotesSnapshot("closed", true);
 
     if (notesPreviousFocus && typeof notesPreviousFocus.focus === "function") {
       notesPreviousFocus.focus();
@@ -1096,6 +1311,10 @@
     document.execCommand(command, false, commandValue || null);
     scheduleNotesSave();
     logStudyEvent("format", "notes-" + command.toLowerCase());
+    logStudyDetail("format", "notes-format-detail", {
+      command: command,
+      value: commandValue || "none",
+    });
   }
 
   function insertNotesImage(dataUrl, altText, source) {
@@ -1109,6 +1328,13 @@
     document.execCommand("insertHTML", false, html);
     saveNotesNow();
     logStudyEvent("insert", source || "notes-image");
+    logStudyDetail("insert", "notes-image-detail", {
+      source: source || "notes-image",
+      altText: altText || "Study note image",
+      dataUrlChars: dataUrl.length,
+      imagesAfter: notesEditor.querySelectorAll("img").length,
+    });
+    logNotesSnapshot("image-added", true);
   }
 
   function readFileAsDataUrl(file) {
@@ -1161,6 +1387,12 @@
 
     try {
       setNotesStatus("Adding image to notes...");
+      logStudyDetail("start", "notes-image-process", {
+        source: source || "notes-image",
+        filename: file.name || "unnamed-image",
+        type: file.type || "unknown",
+        size: file.size || 0,
+      });
       const dataUrl = await readFileAsDataUrl(file);
       const resizedDataUrl = await resizeImageDataUrl(dataUrl);
 
@@ -1168,6 +1400,11 @@
         alert("That image is too large for local notes. Try a smaller screenshot.");
         setNotesStatus("Image was too large to save locally.");
         logStudyEvent("error", "notes-image-too-large");
+        logStudyDetail("error", "notes-image-too-large-detail", {
+          source: source || "notes-image",
+          filename: file.name || "unnamed-image",
+          dataUrlChars: resizedDataUrl.length,
+        });
         return;
       }
 
@@ -1177,11 +1414,22 @@
       console.error("Notes image error:", error);
       setNotesStatus("Could not add that image.");
       logStudyEvent("error", "notes-image-failed");
+      logStudyDetail("error", "notes-image-failed-detail", {
+        source: source || "notes-image",
+        filename: file.name || "unnamed-image",
+        error: error.message || "unknown",
+      });
     }
   }
 
   function handleNotesImageFiles(files, source) {
-    Array.from(files || []).forEach(function (file) {
+    const imageFiles = Array.from(files || []);
+    logStudyDetail("select", "notes-image-files", {
+      source: source || "notes-image",
+      count: imageFiles.length,
+      filenames: imageFiles.map(function (file) { return file.name || "unnamed-image"; }).join(", "),
+    });
+    imageFiles.forEach(function (file) {
       processNotesImageFile(file, source);
     });
   }
@@ -1197,6 +1445,7 @@
 
     try {
       setNotesStatus("Choose a screen, window, or tab to capture.");
+      logStudyEvent("start", "notes-screen-capture");
       stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
 
       const video = document.createElement("video");
@@ -1233,10 +1482,18 @@
 
       insertNotesImage(resizedDataUrl, "Captured screen for study notes", "notes-screen-capture");
       setNotesStatus("Screenshot captured and saved locally.");
+      logStudyDetail("complete", "notes-screen-capture-detail", {
+        width: canvas.width,
+        height: canvas.height,
+        dataUrlChars: resizedDataUrl.length,
+      });
     } catch (error) {
       console.error("Screen capture error:", error);
       setNotesStatus("Screen capture was cancelled or unavailable.");
       logStudyEvent("error", "notes-screen-capture-failed");
+      logStudyDetail("error", "notes-screen-capture-failed-detail", {
+        error: error.name || error.message || "unknown",
+      });
     } finally {
       if (stream) {
         stream.getTracks().forEach(function (track) {
@@ -1254,6 +1511,7 @@
     }
 
     saveNotesNow();
+    logStudyDetail("export", "notes-pdf-print-detail", getNotesSnapshotDetails());
 
     const notesHtml = sanitizeNotesHtml(notesEditor.innerHTML);
     const printWindow = window.open("", "_blank", "width=900,height=700");
@@ -1285,6 +1543,7 @@
     printWindow.document.close();
     setNotesStatus("Print dialog opened. Choose Save as PDF to download.");
     logStudyEvent("export", "notes-pdf-print");
+    logNotesSnapshot("exported", true);
   }
 
   function clearNotes() {
@@ -1293,14 +1552,17 @@
     }
 
     if (!window.confirm("Clear all saved notes for this session?")) {
+      logStudyDetail("cancel", "notes-clear-cancelled", getNotesSnapshotDetails());
       return;
     }
+    logStudyDetail("clear", "notes-clear-detail", getNotesSnapshotDetails());
 
     notesEditor.innerHTML = "";
     localStorage.removeItem(NOTES_STORAGE_KEY);
     setNotesStatus("Notes cleared.");
     updateNotesExportState();
     logStudyEvent("clear", "notes");
+    logNotesSnapshot("cleared", true);
   }
 
   function initializeNotesFeature() {
@@ -1421,6 +1683,56 @@
         event.preventDefault();
         closeNotesPopup();
       }
+    });
+  }
+
+  function formatResourceName(link) {
+    const rawName = (
+      link.dataset.resourceName ||
+      link.getAttribute("download") ||
+      link.textContent ||
+      link.href ||
+      "task-resource"
+    );
+
+    return String(rawName)
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "task-resource";
+  }
+
+  function getResourceLogDetails(link, resourceName) {
+    return {
+      resourceName: resourceName,
+      label: link.textContent || resourceName,
+      href: link.getAttribute("href") || "",
+      download: link.getAttribute("download") || "none",
+    };
+  }
+
+  function initializeTaskResourceLogging() {
+    taskResourceLinks.forEach(function (link) {
+      const resourceName = formatResourceName(link);
+      const resourceDetails = getResourceLogDetails(link, resourceName);
+
+      link.addEventListener("click", function () {
+        logEvent("click", "enhanced-task-resource-" + resourceName);
+        logStudyEvent("download", "task-resource-" + resourceName);
+        logStudyDetail("download", "task-resource-detail", resourceDetails);
+      });
+
+      link.addEventListener("mouseenter", function () {
+        logEvent("hover", "enhanced-task-resource-" + resourceName);
+        logStudyEvent("hover", "task-resource-" + resourceName);
+        logStudyDetail("hover", "task-resource-detail", resourceDetails);
+      });
+
+      link.addEventListener("focus", function () {
+        logEvent("focus", "enhanced-task-resource-" + resourceName);
+        logStudyEvent("focus", "task-resource-" + resourceName);
+        logStudyDetail("focus", "task-resource-detail", resourceDetails);
+      });
     });
   }
 
@@ -1728,11 +2040,18 @@
   function createEvidenceSection(retrievedDocuments) {
     const section = createElement("details", "enhanced-evidence");
     const uniqueDocuments = getUniqueRetrievedDocuments(retrievedDocuments);
-    const sourceCount = getSourceNames(uniqueDocuments).length;
+    const sourceNames = getSourceNames(uniqueDocuments);
+    const sourceCount = sourceNames.length;
     section.open = false;
     section.appendChild(createElement("summary", "", "Show retrieved evidence (" + sourceCount + " source" + (sourceCount === 1 ? "" : "s") + ")"));
     section.addEventListener("toggle", function () {
       logStudyEvent("toggle", section.open ? "evidence-expanded" : "evidence-collapsed");
+      logStudyDetail("toggle", "evidence-toggle-detail", {
+        state: section.open ? "expanded" : "collapsed",
+        sourceCount: sourceCount,
+        evidenceItems: uniqueDocuments.length,
+        sources: sourceNames.join(", "),
+      });
     });
 
     if (!uniqueDocuments || uniqueDocuments.length === 0) {
@@ -1820,13 +2139,28 @@
     saveNotesNow();
     setNotesStatus("Saved AI response to notes.");
     logStudyEvent("save", "response-to-notes");
+    logStudyDetail("save", "response-to-notes-detail", {
+      mode: mode,
+      responseChars: displayText.length,
+      responseWords: countWords(displayText),
+      sourceCount: getSourceNames(entry.retrievedDocuments || []).length,
+      sources: getSourceNames(entry.retrievedDocuments || []).join(", "),
+    });
+    logNotesSnapshot("response-saved", true);
   }
 
-  function createResponseActionButton(label, actionName, onClick) {
+  function createResponseActionButton(label, actionName, onClick, entry) {
     const button = createElement("button", "enhanced-response-action", label);
     button.type = "button";
     button.addEventListener("click", function () {
       logStudyEvent("click", "response-action-" + actionName);
+      logStudyDetail("click", "response-action-detail", {
+        action: actionName,
+        label: label,
+        responseMode: entry ? entry.studyMode || activeMode : activeMode,
+        sourceCount: entry ? getSourceNames(entry.retrievedDocuments || []).length : 0,
+        responseWords: entry ? countWords(removeTrailingPromptBoilerplate(entry.botResponse || "")) : 0,
+      });
       onClick(button);
     });
     return button;
@@ -1837,21 +2171,27 @@
 
     actions.appendChild(createResponseActionButton("Simplify", "simplify", function () {
       setMode("simplify");
+      currentInputSource = "response-action-simplify";
+      currentInputEdited = false;
       sendMessage("Re-explain the previous answer in simpler language with one concrete example.");
-    }));
+    }, entry));
 
     actions.appendChild(createResponseActionButton("Give example", "example", function () {
+      currentInputSource = "response-action-example";
+      currentInputEdited = false;
       sendMessage("Give one concrete example that makes the previous answer easier to understand.");
-    }));
+    }, entry));
 
     actions.appendChild(createResponseActionButton("Compare sources", "compare", function () {
       setMode("compare");
+      currentInputSource = "response-action-compare";
+      currentInputEdited = false;
       sendMessage("Compare how my uploaded documents explain the previous topic. Use short sections and a study takeaway.");
-    }));
+    }, entry));
 
     actions.appendChild(createResponseActionButton("Save to notes", "save-to-notes", function () {
       saveResponseToNotes(entry);
-    }));
+    }, entry));
 
     actions.appendChild(createResponseActionButton("Copy", "copy", function (button) {
       copyTextToClipboard(removeTrailingPromptBoilerplate(entry.botResponse || "")).then(function () {
@@ -1863,7 +2203,7 @@
       }).catch(function (error) {
         console.error("Copy response error:", error);
       });
-    }));
+    }, entry));
 
     return actions;
   }
@@ -1912,6 +2252,12 @@
     emptyDocs.hidden = true;
     docCount.textContent = documents.length + " active";
     sourceChip.textContent = documents.length + " uploaded file" + (documents.length === 1 ? "" : "s");
+    logStudyDetail("state", "document-list-detail", {
+      count: documents.length,
+      filenames: documents.map(function (documentRecord) {
+        return documentRecord.filename || "Untitled document";
+      }).join(", "),
+    });
 
     documents.forEach(function (documentRecord) {
       const item = createElement("li", "enhanced-doc-item");
@@ -1928,6 +2274,12 @@
       item.addEventListener("mouseenter", function () {
         logEvent("hover", "document-" + (documentRecord.filename || "unknown"));
         logStudyEvent("hover", "document-item");
+        logStudyDetail("hover", "document-item-detail", {
+          filename: documentRecord.filename || "Untitled document",
+          status: documentRecord.processingStatus || "unknown",
+          chunks: documentRecord.chunkCount || 0,
+          processedAt: documentRecord.processedAt || "not-processed",
+        });
       });
       docsList.appendChild(item);
     });
@@ -1983,9 +2335,29 @@
     const messageText = String(text || input.value || "").trim();
 
     if (!messageText) {
+      logStudyDetail("submit", "chat-submit-empty-detail", {
+        source: getInputSourceLabel(),
+        mode: activeMode,
+        retrieval: retrievalMethod.value,
+      });
       alert("Please enter a message.");
       return;
     }
+    const submitSource = getInputSourceLabel();
+    const submitMethod = text
+      ? (submitSource.indexOf("response-action") === 0 ? "response-action" : "programmatic")
+      : lastSubmitMethod;
+    logStudyDetail("submit", "chat-submit-detail", {
+      method: submitMethod,
+      source: submitSource,
+      edited: currentInputEdited,
+      mode: activeMode,
+      retrieval: retrievalMethod.value,
+      turnsBefore: conversationHistory.length,
+      chars: messageText.length,
+      words: countWords(messageText),
+      text: truncateForLog(messageText, EVENT_LOG_SNIPPET_LIMIT),
+    });
 
     appendUserMessage(messageText);
     input.value = "";
@@ -2013,6 +2385,13 @@
       if (!response.ok || data.error) {
         appendNotice("Error: " + (data.error || "Failed to get a response."));
         logStudyEvent("error", "chat-response-error");
+        logStudyDetail("error", "chat-response-error-detail", {
+          status: response.status || "unknown",
+          error: data.error || "Failed to get a response.",
+          mode: activeMode,
+          retrieval: retrievalMethod.value,
+          source: submitSource,
+        });
         return;
       }
 
@@ -2028,13 +2407,33 @@
       appendBotMessage(interaction);
       rememberInteraction(interaction);
       logStudyEvent("complete", "chat-response-success");
+      logStudyDetail("complete", "chat-response-success-detail", {
+        mode: interaction.studyMode,
+        retrieval: interaction.retrievalMethod,
+        source: submitSource,
+        responseChars: String(interaction.botResponse || "").length,
+        responseWords: countWords(interaction.botResponse || ""),
+        sourceCount: getSourceNames(interaction.retrievedDocuments || []).length,
+        sources: getSourceNames(interaction.retrievedDocuments || []).join(", "),
+        confidence: interaction.confidenceMetrics && typeof interaction.confidenceMetrics.overallConfidence === "number"
+          ? interaction.confidenceMetrics.overallConfidence
+          : "unavailable",
+      });
     } catch (error) {
       console.error("Error sending enhanced message:", error);
       loadingMessage.remove();
       appendNotice("Error: Failed to get a response.");
       logStudyEvent("error", "chat-request-failed");
+      logStudyDetail("error", "chat-request-failed-detail", {
+        error: error.message || "unknown",
+        mode: activeMode,
+        retrieval: retrievalMethod.value,
+        source: submitSource,
+      });
     } finally {
       sendBtn.disabled = false;
+      currentInputSource = "typed";
+      currentInputEdited = false;
       input.focus();
     }
   }
@@ -2044,14 +2443,23 @@
     logCommonEvent("click", "upload-document");
 
     if (fileInput.files.length === 0) {
+      logStudyDetail("error", "upload-no-file-detail", {
+        fileCount: 0,
+      });
       alert("Please choose a TXT or PDF document first.");
       return;
     }
+    const selectedFile = fileInput.files[0];
 
     const formData = new FormData();
-    formData.append("document", fileInput.files[0]);
+    formData.append("document", selectedFile);
     formData.append("participantID", participantID);
     uploadBtn.disabled = true;
+    logStudyDetail("start", "upload-start-detail", {
+      filename: selectedFile.name || "unnamed-document",
+      type: selectedFile.type || "unknown",
+      size: selectedFile.size || 0,
+    });
 
     try {
       const response = await fetch("/upload-document", {
@@ -2063,11 +2471,21 @@
       if (!response.ok || data.error) {
         appendNotice("Upload error: " + (data.error || "Failed to upload document."));
         logStudyEvent("error", "upload-error");
+        logStudyDetail("error", "upload-error-detail", {
+          filename: selectedFile.name || "unnamed-document",
+          status: response.status || "unknown",
+          error: data.error || "Failed to upload document.",
+        });
         return;
       }
 
       appendNotice("Uploaded " + data.document.filename + " with " + data.document.chunkCount + " processed chunks.");
       logStudyEvent("complete", "upload-success");
+      logStudyDetail("complete", "upload-success-detail", {
+        filename: data.document.filename || selectedFile.name || "unnamed-document",
+        chunks: data.document.chunkCount || 0,
+        status: data.document.processingStatus || "processed",
+      });
       uploadForm.reset();
       fileName.textContent = "No file chosen";
       await loadDocuments();
@@ -2075,6 +2493,10 @@
       console.error("Upload error:", error);
       appendNotice("Upload error: Failed to upload document.");
       logStudyEvent("error", "upload-request-failed");
+      logStudyDetail("error", "upload-request-failed-detail", {
+        filename: selectedFile.name || "unnamed-document",
+        error: error.message || "unknown",
+      });
     } finally {
       uploadBtn.disabled = false;
     }
@@ -2085,6 +2507,12 @@
     logEvent("change", "enhanced-file-input");
     logCommonEvent("change", "file-input");
     logStudyEvent("change", fileInput.files.length > 0 ? "file-selected" : "file-cleared");
+    logStudyDetail("change", "file-input-detail", {
+      fileCount: fileInput.files.length,
+      filename: fileInput.files.length > 0 ? fileInput.files[0].name : "none",
+      type: fileInput.files.length > 0 ? fileInput.files[0].type || "unknown" : "none",
+      size: fileInput.files.length > 0 ? fileInput.files[0].size || 0 : 0,
+    });
   });
 
   retrievalMethod.addEventListener("change", function () {
@@ -2092,6 +2520,13 @@
     logEvent("change", "enhanced-retrieval-method");
     logCommonEvent("change", "retrieval-method");
     logStudyEvent("change", "retrieval-method-" + retrievalMethod.value);
+    logStudyDetail("change", "retrieval-method-detail", {
+      previous: lastRetrievalMethodValue,
+      current: retrievalMethod.value,
+      activeMode: activeMode,
+      turns: conversationHistory.length,
+    });
+    lastRetrievalMethodValue = retrievalMethod.value;
   });
 
   function selectPromptPlaceholder() {
@@ -2105,16 +2540,37 @@
   document.querySelectorAll(".enhanced-prompt-btn").forEach(function (button) {
     button.addEventListener("click", function () {
       setMode(button.dataset.mode);
+      currentInputSource = "prompt-" + button.dataset.mode;
+      currentInputEdited = false;
       input.value = button.dataset.prompt;
       input.focus();
       selectPromptPlaceholder();
       logEvent("click", "prompt-" + button.dataset.mode);
       logStudyEvent("select", "mode-" + button.dataset.mode + "-via-prompt");
+      logStudyDetail("select", "prompt-button-detail", {
+        mode: button.dataset.mode,
+        label: button.textContent || "prompt",
+        chars: String(button.dataset.prompt || "").length,
+        words: countWords(button.dataset.prompt || ""),
+        text: truncateForLog(button.dataset.prompt || "", EVENT_LOG_SNIPPET_LIMIT),
+      });
+      logChatInputSnapshot("prompt-filled", true);
     });
 
     button.addEventListener("mouseenter", function () {
       logEvent("hover", "prompt-" + button.dataset.mode);
       logStudyEvent("hover", "prompt-button");
+      logStudyDetail("hover", "prompt-button-detail", {
+        mode: button.dataset.mode,
+        label: button.textContent || "prompt",
+      });
+    });
+
+    button.addEventListener("focus", function () {
+      logStudyDetail("focus", "prompt-button-detail", {
+        mode: button.dataset.mode,
+        label: button.textContent || "prompt",
+      });
     });
   });
   sendBtn.addEventListener("click", function () {
@@ -2123,10 +2579,25 @@
 
   document.querySelectorAll(".enhanced-tool-btn").forEach(function (button) {
     button.addEventListener("click", function () {
+      const previousMode = activeMode;
       setMode(button.dataset.mode);
       input.focus();
       logEvent("click", "tool-" + button.dataset.mode);
       logStudyEvent("select", "mode-" + button.dataset.mode + "-via-tool");
+      logStudyDetail("select", "study-tool-detail", {
+        previousMode: previousMode,
+        selectedMode: button.dataset.mode,
+        label: button.textContent || "study tool",
+        draftChars: normalizeLogText(input.value).length,
+        draftSource: getInputSourceLabel(),
+      });
+    });
+
+    button.addEventListener("focus", function () {
+      logStudyDetail("focus", "study-tool-detail", {
+        selectedMode: button.dataset.mode,
+        label: button.textContent || "study tool",
+      });
     });
   });
 
@@ -2142,6 +2613,22 @@
   input.addEventListener("focus", function () {
     logEvent("focus", "enhanced-user-input");
     logCommonEvent("focus", "user-input");
+    logChatInputSnapshot("focused", true);
+  });
+
+  input.addEventListener("blur", function () {
+    logChatInputSnapshot("blurred", true);
+  });
+
+  input.addEventListener("input", function () {
+    if (!input.value.trim()) {
+      currentInputSource = "typed";
+      currentInputEdited = false;
+    } else if (currentInputSource !== "typed") {
+      currentInputEdited = true;
+    }
+
+    logChatInputSnapshot("typing", false);
   });
 
   input.addEventListener("keydown", function (event) {
@@ -2172,7 +2659,31 @@
       systemID;
   }
   initializeNotesFeature();
+  initializeTaskResourceLogging();
   initializeWelcomeOverlay();
 
   initializeGuidedTour();
+  logStudyDetail("state", "enhanced-session-loaded", {
+    participant: participantID,
+    system: systemID,
+    mode: activeMode,
+    retrieval: retrievalMethod.value,
+    tourSeen: hasSeenTour(),
+    welcomeSeen: hasSeenWelcome(),
+    notesPresent: notesHasContent(),
+    resourceCount: taskResourceLinks.length,
+  });
+
+  window.addEventListener("pagehide", function () {
+    logChatInputSnapshot("pagehide", true);
+    logNotesSnapshot("pagehide", true);
+    logStudyDetail("state", "enhanced-session-pagehide", {
+      mode: activeMode,
+      retrieval: retrievalMethod.value,
+      turns: conversationHistory.length,
+      notesOpen: notesIsOpen,
+      draftChars: normalizeLogText(input.value).length,
+      draftSource: getInputSourceLabel(),
+    });
+  });
 })();

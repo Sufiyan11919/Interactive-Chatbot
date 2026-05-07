@@ -888,6 +888,7 @@ body.enhanced-page {
 .enhanced-status-row {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
 }
 
@@ -902,6 +903,36 @@ body.enhanced-page {
   background: #ecfdf5;
   color: #047857;
   border-color: #bbf7d0;
+}
+
+.enhanced-tools-separator {
+  width: 1px;
+  min-height: 32px;
+  align-self: stretch;
+  margin: 0 4px;
+  background: #cbd5e1;
+}
+
+.enhanced-header-tools {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid rgba(147, 197, 253, 0.72);
+  border-radius: 999px;
+  background: rgba(239, 246, 255, 0.72);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.08);
+}
+
+.enhanced-tools-label {
+  padding: 0 5px 0 7px;
+  color: #1e40af;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .enhanced-tour-btn,
@@ -938,6 +969,7 @@ body.enhanced-page {
 .enhanced-tour-btn:focus-visible,
 .enhanced-notes-btn:focus-visible,
 .enhanced-workflow-link:focus-visible,
+.enhanced-resource-btn:focus-visible,
 .enhanced-tour-action:focus-visible {
   outline: 3px solid rgba(37, 99, 235, 0.28);
   outline-offset: 2px;
@@ -2058,6 +2090,14 @@ body.enhanced-page {
 
 .enhanced-goal-banner {
   margin: 14px 28px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.enhanced-goal-banner p {
+  max-width: 1120px;
+  margin: 0;
 }
 
 .enhanced-welcome-overlay {
@@ -2161,6 +2201,14 @@ body.enhanced-page {
 
   .enhanced-goal-banner {
     margin: 12px 14px 0;
+  }
+
+  .enhanced-tools-separator {
+    display: none;
+  }
+
+  .enhanced-header-tools {
+    border-radius: 16px;
   }
 }
 
@@ -2401,6 +2449,7 @@ body.enhanced-page {
 }
 
 .enhanced-goal-banner {
+  border-left: 4px solid #2563eb;
   border-color: #bfdbfe;
   border-radius: 16px;
   background:
@@ -2507,10 +2556,20 @@ body.enhanced-page {
 .enhanced-status-row {
   gap: 7px;
 }
+.enhanced-tools-separator {
+  min-height: 28px;
+  margin: 0 2px;
+}
+
+.enhanced-header-tools {
+  gap: 5px;
+  padding: 3px;
+}
 
 .enhanced-status-chip,
 .enhanced-tour-btn,
-.enhanced-notes-btn {
+.enhanced-notes-btn,
+.enhanced-tools-label {
   padding: 6px 9px;
   font-size: 0.76rem;
 }

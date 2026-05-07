@@ -71,8 +71,8 @@
                     <span class="enhanced-mini-badge">PDF</span>
                 </div>
                 <div class="enhanced-resource-actions">
-                    <a class="enhanced-resource-btn" href="/resources/spark_big_data_class.pdf" download>Research Paper</a>
-                    <a class="enhanced-resource-btn" href="/resources/spark_lecture.pdf" download>Lecture Slide</a>
+                    <a class="enhanced-resource-btn" href="/resources/spark_big_data_class.pdf" download data-resource-name="research-paper">Research Paper</a>
+                    <a class="enhanced-resource-btn" href="/resources/spark_lecture.pdf" download data-resource-name="lecture-slide">Lecture Slide</a>
                 </div>
             </section>
         </aside>
@@ -86,14 +86,18 @@
                         <span id="enhanced-context-chip" class="enhanced-status-chip active">Session context active</span>
                         <span id="enhanced-source-chip" class="enhanced-status-chip">Grounded in uploaded files</span>
                         <span id="enhanced-mode-chip" class="enhanced-status-chip">General study mode</span>
-                        <button type="button" id="enhanced-tour-btn" class="enhanced-tour-btn">How it works</button>
-                        <button type="button" id="enhanced-notes-btn" class="enhanced-notes-btn" aria-expanded="false" aria-controls="enhanced-notes-popup">Notes</button>
+                        <span class="enhanced-tools-separator" aria-hidden="true"></span>
+                        <span class="enhanced-header-tools" role="group" aria-label="Enhanced tools">
+                            <span class="enhanced-tools-label">Tools</span>
+                            <button type="button" id="enhanced-tour-btn" class="enhanced-tour-btn">How it works</button>
+                            <button type="button" id="enhanced-notes-btn" class="enhanced-notes-btn" aria-expanded="false" aria-controls="enhanced-notes-popup">Notes</button>
+                        </span>
                     </div>
                 </div>
             </header>
-            <section class="study-goal-banner enhanced-goal-banner" aria-label="Study goal">
-                <strong>Study Goal:</strong>
-                Understand a difficult concept well enough to explain it clearly, define one technical term, and compare how the paper and slides present the concept.
+            <section id="enhanced-task-goal" class="study-goal-banner enhanced-goal-banner" aria-label="Study goal">
+                <p><strong>Scenario:</strong> You are taking a graduate Big Data course, and your professor has assigned the Spark research paper along with lecture slides on Spark. While preparing for class, you notice the concept of lineage and want to understand how it helps Spark recover lost data.</p>
+                <p><strong>Task:</strong> Gather information and learn as much as you can about RDD lineage using the provided Spark research paper and lecture slides. Then, connect this idea to Spark’s broader programming model, including RDDs, transformations, actions, caching, and persistence.</p>
             </section>
 
             <section class="enhanced-prompts" aria-label="Suggested prompts">
@@ -183,8 +187,8 @@
             <p class="enhanced-kicker">System 2: Enhanced</p>
             <h2 id="enhanced-welcome-title">Welcome to the Enhanced AI Study Assistant</h2>
             <p>
-                This version is designed to support conceptual understanding from course papers and lecture slides.
-                Use it to explain concepts, define terms, compare documents, and ask follow-up clarification questions.
+                Your task is to learn RDD lineage in Spark using the provided Spark paper and lecture slides.
+                Use this enhanced assistant to connect lineage to RDDs, transformations, actions, caching, persistence, and fault recovery.
             </p>
             <div class="enhanced-welcome-actions">
                 <button type="button" id="enhanced-welcome-start-btn" class="btn btn-primary">Start Study Task</button>
