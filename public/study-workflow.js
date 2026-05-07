@@ -224,6 +224,7 @@
   }
 
   function redirectToQualtrics(surveyType, flagName, eventLabel) {
+    workflowStatus.textContent = "Redirecting to the " + eventLabel.toLowerCase() + "...";
     fetch("/redirect-to-qualtrics", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
