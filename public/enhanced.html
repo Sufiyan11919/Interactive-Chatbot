@@ -12,15 +12,24 @@
 </head>
 
 <body class="enhanced-page">
+    <nav class="study-topbar enhanced-study-topbar" aria-label="Study navigation">
+        <div>
+            <p class="study-topbar-kicker">System 2 • Enhanced Prototype</p>
+            <h1>AI Study Assistant</h1>
+        </div>
+        <div class="study-topbar-actions">
+            <a id="return-workflow-link" class="study-return-btn" href="/study-workflow.html">Return to Study Workflow</a>
+        </div>
+    </nav>
     <!-- Milestone 3 - Enhanced prototype: System 2 interface implementing the Milestone 2 feature/tool design. -->
     <div class="enhanced-app">
         <aside class="enhanced-sidebar" aria-label="Document management">
             <div class="enhanced-sidebar-header">
                 <div>
-                    <p class="enhanced-kicker">System 2</p>
-                    <h1>AI Study Assistant</h1>
+                    <p class="enhanced-kicker">Course materials</p>
+                    <h1>Documents</h1>
                 </div>
-                <span id="enhanced-system-badge" class="enhanced-badge">Enhanced</span>
+                <span id="enhanced-system-badge" class="enhanced-badge">Files</span>
             </div>
 
             <p id="enhanced-session-meta" class="enhanced-session-meta"></p>
@@ -44,7 +53,7 @@
                     <h2>Uploaded Documents</h2>
                     <span id="enhanced-doc-count" class="enhanced-mini-badge">0 active</span>
                 </div>
-                <p id="enhanced-empty-docs" class="enhanced-empty-state">No documents uploaded yet.</p>
+                <p id="enhanced-empty-docs" class="enhanced-empty-state">No course materials added yet. Uploaded readings will appear here with processing status and chunk counts.</p>
                 <ul id="enhanced-docs-list" class="enhanced-docs-list"></ul>
             </section>
 
@@ -68,10 +77,13 @@
                         <span id="enhanced-mode-chip" class="enhanced-status-chip">General study mode</span>
                         <button type="button" id="enhanced-tour-btn" class="enhanced-tour-btn">How it works</button>
                         <button type="button" id="enhanced-notes-btn" class="enhanced-notes-btn" aria-expanded="false" aria-controls="enhanced-notes-popup">Notes</button>
-                        <a id="return-workflow-link" class="enhanced-workflow-link" href="/study-workflow.html">Return to Study Workflow</a>
                     </div>
                 </div>
             </header>
+            <section class="study-goal-banner enhanced-goal-banner" aria-label="Study goal">
+                <strong>Study Goal:</strong>
+                Understand a difficult concept well enough to explain it clearly, define one technical term, and compare how the paper and slides present the concept.
+            </section>
 
             <section class="enhanced-prompts" aria-label="Suggested prompts">
                 <button type="button" class="enhanced-prompt-btn" data-mode="explain" data-prompt="Explain [concept] from my uploaded course materials in simple language. Include why it matters and one concrete example.">Explain a concept</button>
@@ -146,7 +158,29 @@
                 <button type="button" id="enhanced-notes-export-btn" class="enhanced-notes-action primary">Export PDF</button>
             </div>
         </footer>
+        <span class="enhanced-notes-resize-handle resize-n" data-notes-resize="n" aria-hidden="true"></span>
+        <span class="enhanced-notes-resize-handle resize-e" data-notes-resize="e" aria-hidden="true"></span>
+        <span class="enhanced-notes-resize-handle resize-s" data-notes-resize="s" aria-hidden="true"></span>
+        <span class="enhanced-notes-resize-handle resize-w" data-notes-resize="w" aria-hidden="true"></span>
+        <span class="enhanced-notes-resize-handle resize-nw" data-notes-resize="nw" aria-hidden="true"></span>
+        <span class="enhanced-notes-resize-handle resize-ne" data-notes-resize="ne" aria-hidden="true"></span>
+        <span class="enhanced-notes-resize-handle resize-sw" data-notes-resize="sw" aria-hidden="true"></span>
+        <span class="enhanced-notes-resize-handle resize-se" data-notes-resize="se" aria-hidden="true"></span>
     </section>
+    <div id="enhanced-welcome-overlay" class="enhanced-welcome-overlay" role="dialog" aria-modal="true" aria-labelledby="enhanced-welcome-title" hidden>
+        <section class="enhanced-welcome-card">
+            <p class="enhanced-kicker">System 2: Enhanced</p>
+            <h2 id="enhanced-welcome-title">Welcome to the Enhanced AI Study Assistant</h2>
+            <p>
+                This version is designed to support conceptual understanding from course papers and lecture slides.
+                Use it to explain concepts, define terms, compare documents, and ask follow-up clarification questions.
+            </p>
+            <div class="enhanced-welcome-actions">
+                <button type="button" id="enhanced-welcome-start-btn" class="btn btn-primary">Start Study Task</button>
+                <button type="button" id="enhanced-welcome-skip-btn" class="enhanced-welcome-secondary">Skip intro</button>
+            </div>
+        </section>
+    </div>
     <script src="enhanced.js"></script>
 </body>
 

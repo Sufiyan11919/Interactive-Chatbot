@@ -11,10 +11,14 @@
     <link rel="stylesheet" href="style.css" />
 </head>
 
-<body>
+<body class="study-workflow-page">
     <!-- Assignment: Add a Study Workflow Page & Qualtrics Demographics Survey Link -->
-    <div class="home-container">
-        <h1>Study Workflow</h1>
+    <div class="home-container workflow-shell">
+        <div class="workflow-hero">
+            <p class="workflow-eyebrow">HCAI study session</p>
+            <h1>Study Workflow</h1>
+            <p class="workflow-subtitle">Complete each step in order so your questionnaire responses can be matched with your system interaction logs.</p>
+        </div>
 
         <div class="home-description">
             <p>Please complete the following steps in order.</p>
@@ -25,27 +29,27 @@
         <ol id="workflow-list" class="workflow-list">
             <li>
                 <button id="demographics-btn" class="workflow-btn" type="button">
-                    1. Complete the demographics questionnaire.
+                    Complete the demographics questionnaire.
                 </button>
             </li>
             <li>
                 <button id="task-btn" class="workflow-btn" type="button">
-                    2. Read the task.
+                    Read the task.
                 </button>
             </li>
             <li>
                 <button id="pretask-btn" class="workflow-btn" type="button">
-                    3. Complete the pre-task questionnaire.
+                    Complete the pre-task questionnaire.
                 </button>
             </li>
             <li>
                 <button id="prototype-btn" class="workflow-btn" type="button">
-                    4. Use the assigned AI system.
+                    Use the assigned AI system.
                 </button>
             </li>
             <li>
                 <button id="posttask-btn" class="workflow-btn" type="button">
-                    5. Complete the post-task questionnaire.
+                    Complete the post-task questionnaire.
                 </button>
             </li>
         </ol>

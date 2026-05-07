@@ -12,7 +12,17 @@
     <link rel="stylesheet" href="style.css" />
 </head>
 
-<body>
+<body class="chat-page">
+    <nav class="study-topbar" aria-label="Study navigation">
+        <div>
+            <p class="study-topbar-kicker">System 1</p>
+            <h1>Baseline Chatbot</h1>
+        </div>
+        <div class="study-topbar-actions">
+            <span id="baseline-topbar-meta" class="study-topbar-meta">Loading session...</span>
+            <a id="return-workflow-link" class="study-return-btn" href="/study-workflow.html">Return to Study Workflow</a>
+        </div>
+    </nav>
     <div class="app-container">
         <!-- Assignment 1 - HTML Structure: Left Panel (IDs: doc-panel, upload-form, file-input, upload-btn, uploaded-docs, retrieval-method) -->
         <aside id="doc-panel">
@@ -62,6 +72,10 @@
             </div>
 
             <p id="system-notice" class="system-notice" hidden></p>
+            <section class="study-goal-banner" aria-label="Study goal">
+                <strong>Study Goal:</strong>
+                Understand a difficult concept well enough to explain it clearly, define one technical term, and compare how the paper and slides present the concept.
+            </section>
 
             <div id="messages"></div>
 
@@ -70,10 +84,6 @@
                 <button id="send-btn" class="btn btn-primary">Send</button>
             </div>
         </main>
-    </div>
-    <!-- Milestone 4(a): Return link so participants can get back to complete the post-task questionnaire -->
-    <div style="position:fixed;right:24px;bottom:18px;z-index:10;">
-      <a id="return-workflow-link" href="/study-workflow.html" style="display:inline-flex;align-items:center;justify-content:center;padding:9px 12px;border:1px solid #d1d5db;border-radius:999px;background:#ffffff;color:#374151;font-size:0.9rem;font-weight:700;text-decoration:none;box-shadow:0 8px 20px rgba(0,0,0,0.12);">Return to Study Workflow</a>
     </div>
     <script src="script.js"></script>
 </body>
