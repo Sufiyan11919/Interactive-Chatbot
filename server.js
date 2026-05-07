@@ -19,6 +19,7 @@ const confidenceCalculator = require("./services/confidenceCalculator");
 
 const app = express();
 const uploadDir = path.join(__dirname, "uploads");
+const resourcesDir = path.join(__dirname, "resources");
 const upload = multer({ dest: uploadDir });
 const PORT = process.env.PORT || 3000;
 const RETRIEVAL_TOP_K = 3;
@@ -30,6 +31,14 @@ const STUDY_MODES = new Set(["general", "explain", "compare", "define", "simplif
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(
+  "/resources",
+  express.static(resourcesDir, {
+    setHeaders(res, filePath) {
+      res.setHeader("Content-Disposition", `attachment; filename="${path.basename(filePath)}"`);
+    },
+  })
+);
 app.use(express.static(path.join(__dirname, "public")));
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
