@@ -101,6 +101,41 @@ function normalizeHistoryLimit(limit) {
   return Math.min(parsedLimit, HISTORY_LIMIT);
 }
 
+function sanitizeEventMetadata(metadata) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return {};
+  }
+
+  return Object.entries(metadata).slice(0, 50).reduce((sanitized, [key, value]) => {
+    const safeKey = String(key || "")
+      .trim()
+      .replace(/[.$]/g, "_")
+      .slice(0, 80);
+
+    if (!safeKey || value === undefined || value === null) {
+      return sanitized;
+    }
+
+    if (typeof value === "number" || typeof value === "boolean") {
+      sanitized[safeKey] = value;
+      return sanitized;
+    }
+
+    if (Array.isArray(value)) {
+      sanitized[safeKey] = value.slice(0, 25).map((item) => String(item).slice(0, 240));
+      return sanitized;
+    }
+
+    if (typeof value === "object") {
+      sanitized[safeKey] = JSON.stringify(value).slice(0, 1000);
+      return sanitized;
+    }
+
+    sanitized[safeKey] = String(value).slice(0, 1000);
+    return sanitized;
+  }, {});
+}
+
 function normalizeConversationHistory(history, limit = HISTORY_LIMIT) {
   if (!Array.isArray(history)) {
     return [];
@@ -353,6 +388,7 @@ app.post("/chat", async (req, res) => {
   const userInput = String(req.body.input || req.body.message || "").trim();
   const retrievalMethod = normalizeRetrievalMethod(req.body.retrievalMethod);
   const studyMode = systemID === 2 ? normalizeStudyMode(req.body.studyMode) : "general";
+  const clientMetadata = sanitizeEventMetadata(req.body.clientMetadata);
   const conversationHistory = normalizeConversationHistory(
     req.body.conversationHistory,
     normalizeHistoryLimit(req.body.limit || HISTORY_LIMIT)
@@ -418,6 +454,7 @@ app.post("/chat", async (req, res) => {
       studyMode,
       retrievedDocuments,
       confidenceMetrics,
+      clientMetadata,
     });
 
     res.json({
@@ -486,10 +523,16 @@ app.post("/log-event", async (req, res) => {
   }
 
   const systemID = normalizeSystemID(req.body.systemID, participantID);
-  const { eventType, elementName } = req.body;
+  const eventType = String(req.body.eventType || "").trim();
+  const elementName = String(req.body.elementName || "").trim();
+  const metadata = sanitizeEventMetadata(req.body.metadata);
+
+  if (!eventType || !elementName) {
+    return res.status(400).json({ error: "Event type and element name are required." });
+  }
 
   try {
-    await EventLog.create({ participantID, systemID, eventType, elementName });
+    await EventLog.create({ participantID, systemID, eventType, elementName, metadata });
     res.json({ success: true });
   } catch (err) {
     console.error("Event log error:", err.message);

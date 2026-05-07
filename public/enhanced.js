@@ -28,6 +28,31 @@
     return Number.parseInt(numericMatch[0], 10) % 2 === 0 ? 2 : 1;
   }
 
+  function getEnhancedSessionSummary(reason) {
+    return {
+      reason: reason || "snapshot",
+      condition: "enhanced",
+      taskTopic: "rdd-lineage-spark",
+      sessionDurationMs: Date.now() - enhancedSessionStartedAtMs,
+      turns: conversationHistory.length,
+      mode: activeMode,
+      retrieval: retrievalMethod.value,
+      promptButtonClickCount: promptButtonClickCount,
+      studyToolClickCount: studyToolClickCount,
+      responseActionClickCount: responseActionClickCount,
+      resourceDownloadClickCount: resourceDownloadClickCount,
+      evidenceToggleCount: evidenceToggleCount,
+      retrievalChangeCount: retrievalChangeCount,
+      chatSubmitCount: chatSubmitCount,
+      successfulResponseCount: successfulResponseCount,
+      notesOpen: notesIsOpen,
+      notesPresent: notesHasContent(),
+      draftChars: normalizeLogText(input.value).length,
+      draftWords: countWords(input.value),
+      draftSource: getInputSourceLabel(),
+    };
+  }
+
   function resolveParticipantID() {
     const fromUrl = String(params.get("participantID") || "").trim();
     const fromStorage = String(localStorage.getItem("participantID") || "").trim();
@@ -116,6 +141,7 @@
   const welcomeStartBtn = document.getElementById("enhanced-welcome-start-btn");
   const welcomeSkipBtn = document.getElementById("enhanced-welcome-skip-btn");
   const taskResourceLinks = Array.from(document.querySelectorAll(".enhanced-resource-btn"));
+  const enhancedSessionStartedAtMs = Date.now();
 
   let conversationHistory = [];
   let activeMode = "general";
@@ -133,6 +159,14 @@
   let lastChatInputLogAt = 0;
   let lastChatInputSignature = "";
   let lastRetrievalMethodValue = retrievalMethod.value;
+  let promptButtonClickCount = 0;
+  let studyToolClickCount = 0;
+  let responseActionClickCount = 0;
+  let resourceDownloadClickCount = 0;
+  let evidenceToggleCount = 0;
+  let retrievalChangeCount = 0;
+  let chatSubmitCount = 0;
+  let successfulResponseCount = 0;
   let tourOverlay = null;
   let tourHighlight = null;
   let tourCard = null;
@@ -229,22 +263,28 @@
     });
   }
 
-  function logEvent(eventType, elementName) {
+  function logEvent(eventType, elementName, metadata) {
     fetch("/log-event", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ participantID, systemID: 2, eventType, elementName }),
+      body: JSON.stringify({
+        participantID,
+        systemID: 2,
+        eventType,
+        elementName,
+        metadata: metadata || {},
+      }),
+      keepalive: true,
     }).catch(function (error) {
       console.error("Event log error:", error);
     });
   }
-
-  function logCommonEvent(eventType, elementName) {
-    logEvent(eventType, "common-" + elementName);
+  function logCommonEvent(eventType, elementName, metadata) {
+    logEvent(eventType, "common-" + elementName, metadata);
   }
 
-  function logStudyEvent(eventType, elementName) {
-    logEvent(eventType, "study-" + elementName);
+  function logStudyEvent(eventType, elementName, metadata) {
+    logEvent(eventType, "study-" + elementName, metadata);
   }
 
   function normalizeLogText(value) {
@@ -288,7 +328,7 @@
 
   function logStudyDetail(eventType, elementName, details) {
     const detailText = buildLogDetails(details);
-    logStudyEvent(eventType, detailText ? elementName + "|" + detailText : elementName);
+    logStudyEvent(eventType, detailText ? elementName + "|" + detailText : elementName, details);
   }
 
   function getNotesSnapshotDetails() {
@@ -1717,9 +1757,14 @@
       const resourceDetails = getResourceLogDetails(link, resourceName);
 
       link.addEventListener("click", function () {
-        logEvent("click", "enhanced-task-resource-" + resourceName);
-        logStudyEvent("download", "task-resource-" + resourceName);
-        logStudyDetail("download", "task-resource-detail", resourceDetails);
+        resourceDownloadClickCount += 1;
+        const downloadDetails = Object.assign({
+          resourceDownloadClickCount: resourceDownloadClickCount,
+        }, resourceDetails);
+
+        logEvent("click", "enhanced-task-resource-" + resourceName, downloadDetails);
+        logStudyEvent("download", "task-resource-" + resourceName, downloadDetails);
+        logStudyDetail("download", "task-resource-detail", downloadDetails);
       });
 
       link.addEventListener("mouseenter", function () {
@@ -2045,9 +2090,16 @@
     section.open = false;
     section.appendChild(createElement("summary", "", "Show retrieved evidence (" + sourceCount + " source" + (sourceCount === 1 ? "" : "s") + ")"));
     section.addEventListener("toggle", function () {
-      logStudyEvent("toggle", section.open ? "evidence-expanded" : "evidence-collapsed");
+      evidenceToggleCount += 1;
+      logStudyEvent("toggle", section.open ? "evidence-expanded" : "evidence-collapsed", {
+        state: section.open ? "expanded" : "collapsed",
+        evidenceToggleCount: evidenceToggleCount,
+        sourceCount: sourceCount,
+        evidenceItems: uniqueDocuments.length,
+      });
       logStudyDetail("toggle", "evidence-toggle-detail", {
         state: section.open ? "expanded" : "collapsed",
+        evidenceToggleCount: evidenceToggleCount,
         sourceCount: sourceCount,
         evidenceItems: uniqueDocuments.length,
         sources: sourceNames.join(", "),
@@ -2153,10 +2205,16 @@
     const button = createElement("button", "enhanced-response-action", label);
     button.type = "button";
     button.addEventListener("click", function () {
-      logStudyEvent("click", "response-action-" + actionName);
+      responseActionClickCount += 1;
+      logStudyEvent("click", "response-action-" + actionName, {
+        action: actionName,
+        responseActionClickCount: responseActionClickCount,
+        mode: entry ? entry.studyMode || activeMode : activeMode,
+      });
       logStudyDetail("click", "response-action-detail", {
         action: actionName,
         label: label,
+        responseActionClickCount: responseActionClickCount,
         responseMode: entry ? entry.studyMode || activeMode : activeMode,
         sourceCount: entry ? getSourceNames(entry.retrievedDocuments || []).length : 0,
         responseWords: entry ? countWords(removeTrailingPromptBoilerplate(entry.botResponse || "")) : 0,
@@ -2347,6 +2405,9 @@
     const submitMethod = text
       ? (submitSource.indexOf("response-action") === 0 ? "response-action" : "programmatic")
       : lastSubmitMethod;
+    chatSubmitCount += 1;
+    const isFollowUp = conversationHistory.length > 0 || activeMode === "simplify" || submitSource.indexOf("response-action") === 0;
+    const isCrossDocumentIntent = activeMode === "compare" || /compare|difference|similar/i.test(messageText);
     logStudyDetail("submit", "chat-submit-detail", {
       method: submitMethod,
       source: submitSource,
@@ -2354,6 +2415,9 @@
       mode: activeMode,
       retrieval: retrievalMethod.value,
       turnsBefore: conversationHistory.length,
+      chatSubmitCount: chatSubmitCount,
+      isFollowUp: isFollowUp,
+      isCrossDocumentIntent: isCrossDocumentIntent,
       chars: messageText.length,
       words: countWords(messageText),
       text: truncateForLog(messageText, EVENT_LOG_SNIPPET_LIMIT),
@@ -2377,6 +2441,22 @@
           studyMode: activeMode,
           conversationHistory: getRecentConversationHistory(),
           limit: HISTORY_LIMIT,
+          clientMetadata: {
+            submitMethod: submitMethod,
+            submitSource: submitSource,
+            edited: currentInputEdited,
+            turnsBefore: conversationHistory.length,
+            chatSubmitCount: chatSubmitCount,
+            promptButtonClickCount: promptButtonClickCount,
+            studyToolClickCount: studyToolClickCount,
+            responseActionClickCount: responseActionClickCount,
+            resourceDownloadClickCount: resourceDownloadClickCount,
+            retrievalChangeCount: retrievalChangeCount,
+            isFollowUp: isFollowUp,
+            isCrossDocumentIntent: isCrossDocumentIntent,
+            promptChars: messageText.length,
+            promptWords: countWords(messageText),
+          },
         }),
       });
       const data = await response.json();
@@ -2406,11 +2486,19 @@
 
       appendBotMessage(interaction);
       rememberInteraction(interaction);
-      logStudyEvent("complete", "chat-response-success");
+      successfulResponseCount += 1;
+      logStudyEvent("complete", "chat-response-success", {
+        successfulResponseCount: successfulResponseCount,
+        chatSubmitCount: chatSubmitCount,
+        mode: interaction.studyMode,
+        retrieval: interaction.retrievalMethod,
+      });
       logStudyDetail("complete", "chat-response-success-detail", {
         mode: interaction.studyMode,
         retrieval: interaction.retrievalMethod,
         source: submitSource,
+        chatSubmitCount: chatSubmitCount,
+        successfulResponseCount: successfulResponseCount,
         responseChars: String(interaction.botResponse || "").length,
         responseWords: countWords(interaction.botResponse || ""),
         sourceCount: getSourceNames(interaction.retrievedDocuments || []).length,
@@ -2517,12 +2605,18 @@
 
   retrievalMethod.addEventListener("change", function () {
     appendNotice("Retrieval method changed to " + retrievalMethod.value + ".");
+    retrievalChangeCount += 1;
     logEvent("change", "enhanced-retrieval-method");
     logCommonEvent("change", "retrieval-method");
-    logStudyEvent("change", "retrieval-method-" + retrievalMethod.value);
+    logStudyEvent("change", "retrieval-method-" + retrievalMethod.value, {
+      previous: lastRetrievalMethodValue,
+      current: retrievalMethod.value,
+      retrievalChangeCount: retrievalChangeCount,
+    });
     logStudyDetail("change", "retrieval-method-detail", {
       previous: lastRetrievalMethodValue,
       current: retrievalMethod.value,
+      retrievalChangeCount: retrievalChangeCount,
       activeMode: activeMode,
       turns: conversationHistory.length,
     });
@@ -2539,17 +2633,25 @@
 
   document.querySelectorAll(".enhanced-prompt-btn").forEach(function (button) {
     button.addEventListener("click", function () {
+      promptButtonClickCount += 1;
       setMode(button.dataset.mode);
       currentInputSource = "prompt-" + button.dataset.mode;
       currentInputEdited = false;
       input.value = button.dataset.prompt;
       input.focus();
       selectPromptPlaceholder();
-      logEvent("click", "prompt-" + button.dataset.mode);
-      logStudyEvent("select", "mode-" + button.dataset.mode + "-via-prompt");
+      logEvent("click", "prompt-" + button.dataset.mode, {
+        mode: button.dataset.mode,
+        promptButtonClickCount: promptButtonClickCount,
+      });
+      logStudyEvent("select", "mode-" + button.dataset.mode + "-via-prompt", {
+        mode: button.dataset.mode,
+        promptButtonClickCount: promptButtonClickCount,
+      });
       logStudyDetail("select", "prompt-button-detail", {
         mode: button.dataset.mode,
         label: button.textContent || "prompt",
+        promptButtonClickCount: promptButtonClickCount,
         chars: String(button.dataset.prompt || "").length,
         words: countWords(button.dataset.prompt || ""),
         text: truncateForLog(button.dataset.prompt || "", EVENT_LOG_SNIPPET_LIMIT),
@@ -2580,13 +2682,22 @@
   document.querySelectorAll(".enhanced-tool-btn").forEach(function (button) {
     button.addEventListener("click", function () {
       const previousMode = activeMode;
+      studyToolClickCount += 1;
       setMode(button.dataset.mode);
       input.focus();
-      logEvent("click", "tool-" + button.dataset.mode);
-      logStudyEvent("select", "mode-" + button.dataset.mode + "-via-tool");
+      logEvent("click", "tool-" + button.dataset.mode, {
+        selectedMode: button.dataset.mode,
+        studyToolClickCount: studyToolClickCount,
+      });
+      logStudyEvent("select", "mode-" + button.dataset.mode + "-via-tool", {
+        previousMode: previousMode,
+        selectedMode: button.dataset.mode,
+        studyToolClickCount: studyToolClickCount,
+      });
       logStudyDetail("select", "study-tool-detail", {
         previousMode: previousMode,
         selectedMode: button.dataset.mode,
+        studyToolClickCount: studyToolClickCount,
         label: button.textContent || "study tool",
         draftChars: normalizeLogText(input.value).length,
         draftSource: getInputSourceLabel(),
@@ -2603,9 +2714,21 @@
 
   chatForm.addEventListener("submit", function (event) {
     event.preventDefault();
-    logEvent("click", "enhanced-send-btn");
-    logCommonEvent("submit", "send-message");
-    logStudyEvent("submit", "chat-submit-" + lastSubmitMethod);
+    logEvent("click", "enhanced-send-btn", {
+      method: lastSubmitMethod,
+      mode: activeMode,
+      retrieval: retrievalMethod.value,
+    });
+    logCommonEvent("submit", "send-message", {
+      method: lastSubmitMethod,
+      mode: activeMode,
+      retrieval: retrievalMethod.value,
+    });
+    logStudyEvent("submit", "chat-submit-" + lastSubmitMethod, {
+      method: lastSubmitMethod,
+      mode: activeMode,
+      retrieval: retrievalMethod.value,
+    });
     sendMessage();
     lastSubmitMethod = "button";
   });
@@ -2657,13 +2780,17 @@
       encodeURIComponent(participantID) +
       "&systemID=" +
       systemID;
+
+    returnWorkflowLink.addEventListener("click", function () {
+      logStudyEvent("return", "return-to-workflow", getEnhancedSessionSummary("return-to-workflow"));
+    });
   }
   initializeNotesFeature();
   initializeTaskResourceLogging();
   initializeWelcomeOverlay();
 
   initializeGuidedTour();
-  logStudyDetail("state", "enhanced-session-loaded", {
+  logStudyDetail("state", "enhanced-session-loaded", Object.assign({
     participant: participantID,
     system: systemID,
     mode: activeMode,
@@ -2672,18 +2799,11 @@
     welcomeSeen: hasSeenWelcome(),
     notesPresent: notesHasContent(),
     resourceCount: taskResourceLinks.length,
-  });
+  }, getEnhancedSessionSummary("loaded")));
 
   window.addEventListener("pagehide", function () {
     logChatInputSnapshot("pagehide", true);
     logNotesSnapshot("pagehide", true);
-    logStudyDetail("state", "enhanced-session-pagehide", {
-      mode: activeMode,
-      retrieval: retrievalMethod.value,
-      turns: conversationHistory.length,
-      notesOpen: notesIsOpen,
-      draftChars: normalizeLogText(input.value).length,
-      draftSource: getInputSourceLabel(),
-    });
+    logStudyDetail("state", "enhanced-session-pagehide", getEnhancedSessionSummary("pagehide"));
   });
 })();

@@ -32,6 +32,7 @@ const interactionSchema = new mongoose.Schema({
   studyMode: { type: String, default: "general" },
   retrievedDocuments: { type: [retrievedDocumentSchema], default: [] },
   confidenceMetrics: { type: confidenceMetricsSchema, default: null },
+  clientMetadata: { type: mongoose.Schema.Types.Mixed, default: {} },
   timestamp:     { type: Date,   default: Date.now }
 });
 

@@ -76,14 +76,51 @@
   );
 
   // ── Event logger ─────────────────────────────────────────────────────────────
-  function logEvent(eventType, elementName) {
+  function logEvent(eventType, elementName, metadata) {
+    const payload = JSON.stringify({
+      participantID,
+      systemID,
+      eventType,
+      elementName,
+      metadata: metadata || {},
+    });
+
+    if (navigator.sendBeacon) {
+      const eventBlob = new Blob([payload], { type: "application/json" });
+
+      if (navigator.sendBeacon("/log-event", eventBlob)) {
+        return;
+      }
+    }
+
     fetch("/log-event", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ participantID, systemID, eventType, elementName }),
+      body: payload,
+      keepalive: true,
     }).catch(function (err) {
       console.error("Event log error:", err);
     });
+  }
+
+  function getSystemCondition() {
+    return systemID === 2 ? "enhanced" : "baseline";
+  }
+
+  function getTaskTimingDetails(action, timestamp) {
+    const startedAt = workflowState.prototypeStartedAt || "";
+    const startedAtTime = startedAt ? new Date(startedAt).getTime() : NaN;
+    const elapsedMs = Number.isFinite(startedAtTime) ? Date.now() - startedAtTime : null;
+
+    return {
+      action: action,
+      condition: getSystemCondition(),
+      taskTopic: "rdd-lineage-spark",
+      workflowStep: "ai-system-interaction",
+      startedAtClient: startedAt,
+      timestampClient: timestamp || new Date().toISOString(),
+      elapsedMs: elapsedMs,
+    };
   }
 
   // ── Handle flags returned from Qualtrics via URL ─────────────────────────────
@@ -255,28 +292,52 @@
 
   // Step 1: Demographics
   demographicsBtn.addEventListener("click", function () {
-    logEvent("click", "demographics-btn");
+    logEvent("click", "demographics-btn", {
+      workflowStep: "demographics",
+      condition: getSystemCondition(),
+    });
     redirectToQualtrics("demographics", "demographicsComplete", "Demographics Questionnaire");
   });
 
   // Step 2: Task
   taskBtn.addEventListener("click", function () {
-    logEvent("click", "task-btn");
+    logEvent("click", "task-btn", {
+      workflowStep: "task-description",
+      condition: getSystemCondition(),
+      taskTopic: "rdd-lineage-spark",
+    });
     taskDetails.hidden = false;
     markStepComplete("taskRead");
   });
 
   // Step 3: Pre-task
   pretaskBtn.addEventListener("click", function () {
-    logEvent("click", "pretask-btn");
+    logEvent("click", "pretask-btn", {
+      workflowStep: "pretask",
+      condition: getSystemCondition(),
+    });
     redirectToQualtrics("pretask", "pretaskComplete", "Pre-Task Questionnaire");
   });
 
   // Step 4: AI prototype
   prototypeBtn.addEventListener("click", function () {
-    logEvent("click", "prototype-btn");
-    markStepComplete("prototypeStarted");
     const destination = systemID === 2 ? "/enhanced.html" : "/chat.html";
+    const startedAtClient = new Date().toISOString();
+
+    workflowState = Object.assign({}, workflowState, {
+      prototypeStarted: true,
+      prototypeStartedAt: startedAtClient,
+      prototypeTaskActive: true,
+      prototypeDestination: destination,
+    });
+    saveWorkflowState(workflowState);
+    updateWorkflowUI();
+    logEvent("click", "prototype-btn", {
+      workflowStep: "prototype",
+      condition: getSystemCondition(),
+      destination: destination,
+    });
+    logEvent("task_start", "ai-system-interaction", getTaskTimingDetails("start", startedAtClient));
     window.location.href =
       destination +
       "?participantID=" + encodeURIComponent(participantID) +
@@ -285,7 +346,18 @@
 
   // Step 5: Post-task
   posttaskBtn.addEventListener("click", function () {
-    logEvent("click", "posttask-btn");
+    const endedAtClient = new Date().toISOString();
+
+    logEvent("click", "posttask-btn", {
+      workflowStep: "posttask",
+      condition: getSystemCondition(),
+    });
+    logEvent("task_end", "ai-system-interaction", getTaskTimingDetails("end", endedAtClient));
+    workflowState = Object.assign({}, workflowState, {
+      prototypeTaskActive: false,
+      prototypeEndedAt: endedAtClient,
+    });
+    saveWorkflowState(workflowState);
     redirectToQualtrics("posttask", "posttaskComplete", "Post-Task Questionnaire");
   });
 

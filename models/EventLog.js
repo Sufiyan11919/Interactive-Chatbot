@@ -7,6 +7,7 @@ const eventLogSchema = new mongoose.Schema({
   systemID: { type: Number, enum: [1, 2], default: 1 },
   eventType:     { type: String, required: true },
   elementName:   { type: String, required: true },
+  metadata:      { type: mongoose.Schema.Types.Mixed, default: {} },
   timestamp:     { type: Date,   default: Date.now }
 });
 
