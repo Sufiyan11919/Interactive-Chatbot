@@ -1934,9 +1934,9 @@ body.enhanced-page {
   align-items: center;
   justify-content: center;
   padding: 10px 14px;
-  border: 1px solid #93c5fd;
+  border: 1px solid #fca5a5;
   border-radius: 999px;
-  background: #2563eb;
+  background: #dc2626;
   color: #ffffff;
   font-size: 0.88rem;
   font-weight: 800;
@@ -1945,8 +1945,8 @@ body.enhanced-page {
 }
 
 .study-return-btn:hover {
-  background: #1d4ed8;
-  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.22);
+  background: #b91c1c;
+  box-shadow: 0 10px 24px rgba(220, 38, 38, 0.22);
 }
 
 .study-return-btn:active {
@@ -2126,14 +2126,14 @@ body.enhanced-page {
 }
 
 .enhanced-study-topbar .study-return-btn {
-  border-color: #bfdbfe;
-  background: #eff6ff;
-  color: #1d4ed8;
-  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.08);
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+  box-shadow: 0 8px 18px rgba(220, 38, 38, 0.08);
 }
 
 .enhanced-study-topbar .study-return-btn:hover {
-  background: #2563eb;
+  background: #dc2626;
   color: #ffffff;
 }
 
